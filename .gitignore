@@ -1,0 +1,84 @@
+# Entornos virtuales
+.venv/
+env/
+venv/
+
+# Archivos de configuración de entorno
+.env
+.env.*
+
+# Archivos compilados de Python
+*.pyc
+*.pyo
+__pycache__/
+
+# Archivos de logs
+*.log
+
+# Configuración de IDEs
+.vscode/
+.idea/
+
+# Archivos de pruebas
+*.pytest_cache/
+.tox/
+
+# Dependencias instaladas
+*.egg-info/
+dist/
+build/
+
+# Otros
+.DS_Store
+Thumbs.db
+.amazonq/*
+
+
+data/attachments/*
+!data/attachments/.gitkeep
+data/token.json
+data/credentials.json
+data/concentratorip/attachments/*
+!data/concentratorip/attachments/.gitkeep
+data/correlativedni/attachments/*
+!data/correlativedni/attachments/.gitkeep
+data/correlativedniretail/attachments/*
+!data/correlativedniretail/attachments/.gitkeep
+data/depositosanomalos/attachments/*
+!data/depositosanomalos/attachments/.gitkeep
+data/emailsimilares/attachments/*
+!data/emailsimilares/attachments/.gitkeep
+data/loginipblacklist/attachments/*
+!data/loginipblacklist/attachments/.gitkeep
+data/documentoscorrelativos/attachments/*
+!data/documentoscorrelativos/attachments/.gitkeep
+data/namesimilares/attachments/*
+!data/namesimilares/attachments/.gitkeep
+data/similarymail/attachments/*
+!data/similarymail/attachments/.gitkeep
+data/similaryname/attachments/*
+!data/similaryname/attachments/.gitkeep
+data/liquidations/calimaco/*
+data/liquidations/kashio/*
+data/liquidations/conciliation/*
+!data/liquidations/conciliation/.gitkeep
+data/depositosretirostlsretail/attachments/*
+!data/depositosretirostlsretail/attachments/.gitkeep
+data/flujocaja/attachments/*
+!data/flujocaja/attachments/.gitkeep
+data/ligauno/attachments/*
+!data/ligauno/attachments/.gitkeep
+!data/ligauno/attachments/data.xlsx
+data/depositosmanuales/attachments/*
+!data/depositosmanuales/attachments/.gitkeep
+data/cambiosestadomanuales/attachments/*
+!data/cambiosestadomanuales/attachments/.gitkeep
+data/tsniubiz/output/*
+!data/tsniubiz/output/.gitkeep
+
+secrets.json
+debug_output/*
+data/debug_output/*
+CODING_GUIDELINES.md
+AUTH_DOCUMENTATION.md
+tests/*

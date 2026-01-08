@@ -1,0 +1,53 @@
+# Archivos y directorios a ignorar en el build de Docker
+.git
+.gitignore
+.gitlab-ci.yml
+README.md
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Archivos de desarrollo
+.vscode/
+.idea/
+*.pyc
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Archivos de entorno local
+.env.local
+.env.development
+
+# Datos y logs
+data/
+debug_output/
+logs/
+*.log
+
+# Archivos temporales
+tmp/
+temp/
+.tmp/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de pruebas
+tests/
+test_*.py
+*_test.py
+
+# Documentación
+docs/
+*.md
+!README.md
+.amazonq
+
+# Archivos de configuración local
+secrets.json
+credentials.json
+token.json
+.amazonq

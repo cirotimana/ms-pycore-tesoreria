@@ -1,0 +1,10 @@
+include:
+  - project: "devops/continuous-automation"
+    ref: "main"
+    file: "devops/prev-fraude/pipeline-ci-back.yaml"
+
+variables:
+  FOLDER_NAME: task-pf-pycore
+  IMAGE_NAME: pf/task-pf-pycore
+  IMAGE_VERSION: 1.0.1
+  # comment to test
