@@ -18,7 +18,6 @@ services:
       - .:/app
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
-      # Asegurate de que las demas variables de entorno se pasen aqui o usa env_file
     env_file:
       - .env
     depends_on:
