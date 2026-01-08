@@ -31,4 +31,6 @@ celery_app.autodiscover_tasks([
     'app.digital.collectors.pagoefectivo',
     'app.digital.collectors.safetypay',
     'app.digital.collectors.tupay',
+    'app.digital.concentratorIP',
+    'app.digital.DNIcorrelatives',
 ])

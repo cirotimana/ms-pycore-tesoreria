@@ -26,6 +26,10 @@ from app.digital.collectors.tupay.routes import router as gettupay_router
 from app.digital.collectors.tupay.liquidations.routes import router as gettupayliq_router
 from app.common.routes_download import router as download_router
 
+##
+from app.digital.concentratorIP.routes import router as concentratorip_router
+from app.digital.DNIcorrelatives.routes import router as dnicorrelatives_router
+
 
 ##CONTROL
 from app.utils.routes import router as utils_router
@@ -133,13 +137,16 @@ app.include_router(gettupayliq_router, prefix="/digital", tags=["LIQUIDACION-TUP
 app.include_router(download_router, prefix="/digital", tags=["GENERAR-LINK"], dependencies=[Depends(get_current_active_user)])
 
 
+app.include_router(concentratorip_router, prefix="/digital", tags=["CONCENTRATOR-IP"], dependencies=[Depends(get_current_active_user)])
+app.include_router(dnicorrelatives_router, prefix="/digital", tags=["DNI-CORRELATIVES"], dependencies=[Depends(get_current_active_user)])
+
 ##CONTROL (protegido con jwt)
 app.include_router(utils_router, prefix="/utils", tags=["UTILS"], dependencies=[Depends(get_current_active_user)])
 
 # Mensaje de bienvenida
 @app.get("/")
 def read_root():
-    return {"message": "Bienvenido al servicio de Pycore-Backend API"}
+    return {"message": "Bienvenido al servicio de Pycore-Backend API - Tesoreria"}
 
 
 @app.get("/docs-scalar",  include_in_schema=False)
