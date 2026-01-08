@@ -19,7 +19,7 @@ class Config:
     # JWT
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default_secret_key")
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-    JWT_EXPIRATION_TIME = int(os.getenv("JWT_EXPIRATION_TIME", 86400))  # 1 dia = 86400 segundos
+    JWT_EXPIRATION_TIME = int(os.getenv("JWT_EXPIRATION_TIME", 86400))  # 1 dia = 86400 segundos 
 
     # CORS
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(",")
