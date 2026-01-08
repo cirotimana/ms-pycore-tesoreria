@@ -22,7 +22,7 @@ class Config:
     JWT_EXPIRATION_TIME = int(os.getenv("JWT_EXPIRATION_TIME", 86400))  # 1 dia = 86400 segundos 
 
     # CORS
-    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(",")
+    CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()]
 
     # CCTV
     DB_USER_CCTV = os.getenv("DB_USER_CCTV", "")
