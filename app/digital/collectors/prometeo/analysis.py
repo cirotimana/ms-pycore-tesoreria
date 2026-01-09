@@ -46,9 +46,11 @@ def updated_data_prometeo():
             print("[ERROR] Fallo la descarga de Calimaco")
             return False
         
-        # actualizar timestamp del collector
-        with next(get_dts_session()) as session:
+        # actualizar timestamp del collector de forma dual
+        def update_save(session):
             update_collector_timestamp(session, 10)  # 10 = Prometeo (asumiendo ID)
+        
+        run_on_dual_dts(update_save)
         
         print(f"[SUCCESS] Proceso automatico completado para {today_date}")
         return True

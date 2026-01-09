@@ -2,7 +2,7 @@ from sqlalchemy import text
 import pandas as pd
 from datetime import datetime
 import pytz
-from app.common.database import get_dts_session
+from app.common.database import get_dts_session, get_dts_aws_session
 
 
 from app.models.bot_executions import *
@@ -28,20 +28,28 @@ def get_dni_data(engine, query):
     return pd.read_sql(query, engine)
 
 def save_to_database(df, total_dni, total_registros):
-    """guarda los resultados en la base de datos"""
-    with next(get_dts_session()) as session:
-        # insertar ejecucion del bot
-        execution_id = insert_bot_execution(session, total_dni, total_registros)
-        
-        # procesar cada grupo de dnis (solo si hay datos)
-        if df is not None and len(df) > 0:
-            for case_number, group in df.groupby('case_number'):
-                case_id = insert_case(session, execution_id, len(group))
-                insert_incidents(session, case_id, group)
-        
-        # actualizar ultima ejecucion del bot
-        update_bot_last_run(session)
-        session.commit()
+    """guarda los resultados en la base de datos (Dual: DTS y AWS)"""
+    sessions = [get_dts_session(), get_dts_aws_session()]
+    
+    for session_gen in sessions:
+        try:
+            with next(session_gen) as session:
+                # insertar ejecucion del bot
+                execution_id = insert_bot_execution(session, total_dni, total_registros)
+                
+                # procesar cada grupo de dnis (solo si hay datos)
+                if df is not None and len(df) > 0:
+                    for case_number, group in df.groupby('case_number'):
+                        case_id = insert_case(session, execution_id, len(group))
+                        insert_incidents(session, case_id, group)
+                
+                # actualizar ultima ejecucion del bot
+                update_bot_last_run(session)
+                session.commit()
+                print(f"[DATABASE] Insercion exitosa en {'DTS' if session_gen == sessions[0] else 'AWS RDS'}")
+        except Exception as e:
+            print(f"[DATABASE] Error al insertar en {'DTS' if session_gen == sessions[0] else 'AWS RDS'}: {e}")
+            continue
 
 def insert_bot_execution(session, total_processed, total_detected):
     """Insertar en Bot_Executions"""

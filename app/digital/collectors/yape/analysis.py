@@ -144,13 +144,12 @@ def conciliation_data(from_date, to_date):
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
         df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
         
-        # Insertar datos del collector (Yape)
-        with next(get_dts_session()) as session:
+        # Insertar datos del collector y Calimaco de forma dual
+        def initial_save(session):
             bulk_upsert_collector_records_optimized(session, df2, 5)  
-
-        # Insertar datos de Calimaco
-        with next(get_dts_session()) as session:
             bulk_upsert_calimaco_records_optimized(session, df1, 5) 
+        
+        run_on_dual_dts(initial_save)
         
         cols_calimaco = [
             "ID",
@@ -318,36 +317,38 @@ def conciliation_data(from_date, to_date):
         from_date_fmt = from_date.date()
         to_date_fmt = to_date.date()  
 
-        # Insertar en la base de datos las rutas finales
-        with next(get_dts_session()) as session:
-                conciliation_id = insert_conciliations(
-                    5,
-                    session,
-                    1,
-                    from_date_fmt,
-                    to_date_fmt,
-                    metricas["recaudacion_calimaco"],
-                    metricas["recaudacion_yape"],
-                    metricas["aprobados_calimaco"],
-                    metricas["aprobados_yape"],
-                    metricas["no_conciliados_calimaco"],
-                    metricas["no_conciliados_yape"],
-                    metricas["no_conciliados_monto_calimaco"],
-                    metricas["no_conciliados_monto_yape"],
-                )
-                insert_conciliation_files(
-                    session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{new_calimaco_key}"
-                )
-                insert_conciliation_files(
-                    session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{new_yape_key}"
-                )
-                insert_conciliation_files(
-                    session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{output_key}"
-                )
-                insert_conciliation_files(
-                    session, conciliation_id, 2, f"s3://{Config.S3_BUCKET}/{output_key_re}"
-                )
-                session.commit()
+        # Insertar en la base de datos las rutas finales de forma dual
+        def final_save(session):
+            conciliation_id = insert_conciliations(
+                5,
+                session,
+                1,
+                from_date_fmt,
+                to_date_fmt,
+                metricas["recaudacion_calimaco"],
+                metricas["recaudacion_yape"],
+                metricas["aprobados_calimaco"],
+                metricas["aprobados_yape"],
+                metricas["no_conciliados_calimaco"],
+                metricas["no_conciliados_yape"],
+                metricas["no_conciliados_monto_calimaco"],
+                metricas["no_conciliados_monto_yape"],
+            )
+            insert_conciliation_files(
+                session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{new_calimaco_key}"
+            )
+            insert_conciliation_files(
+                session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{new_yape_key}"
+            )
+            insert_conciliation_files(
+                session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{output_key}"
+            )
+            insert_conciliation_files(
+                session, conciliation_id, 2, f"s3://{Config.S3_BUCKET}/{output_key_re}"
+            )
+            session.commit()
+
+        run_on_dual_dts(final_save)
                 
         print(f"[SUCCESS] Conciliacion completada exitosamente: {output_key}")
         return True
@@ -402,16 +403,13 @@ def updated_data_yape():
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
         df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
         
-        # insertar datos en base de datos
-        with next(get_dts_session()) as session:
+        # insertar datos y actualizar timestamp de forma dual
+        def update_save(session):
             bulk_upsert_collector_records_optimized(session, df2, 5) 
-
-        with next(get_dts_session()) as session:
             bulk_upsert_calimaco_records_optimized(session, df1, 5)  
-
-        # actualizar timestamp del collector
-        with next(get_dts_session()) as session:
             update_collector_timestamp(session, 5) 
+
+        run_on_dual_dts(update_save)
 
         # eliminar archivos procesados
         delete_file_from_s3(yape_key)
