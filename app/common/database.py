@@ -50,6 +50,18 @@ url_dts = URL.create(
 engine_dts = create_engine(url_dts, echo=False, pool_pre_ping=True)
 
 
+url_dts_aws = URL.create(
+    drivername="postgresql+psycopg",
+    username=Config.DB_USER_DTS_AWS,
+    password=Config.DB_PASSWORD_DTS_AWS,
+    host=Config.DB_HOST_DTS_AWS,
+    port=Config.DB_PORT_DTS_AWS,
+    database=Config.DB_NAME_DTS_AWS,
+)
+
+engine_dts_aws = create_engine(url_dts_aws, echo=False, pool_pre_ping=True)
+
+
 url_azure = URL.create(
     drivername="mssql+pyodbc",
     username=Config.AZURE_USERNAME,
@@ -80,6 +92,10 @@ def get_cctv_session():
 def get_dts_session():
     with Session(engine_dts) as session:
         yield session
+
+def get_dts_aws_session():
+    with Session(engine_dts_aws) as session:
+        yield session
         
 def get_azure_session():
     with Session(engine_azure) as session:
@@ -89,7 +105,35 @@ def create_all():
     SQLModel.metadata.create_all(bind=engine_cctv)
     SQLModel.metadata.create_all(bind=engine_ts)
     SQLModel.metadata.create_all(bind=engine_dts)
+    SQLModel.metadata.create_all(bind=engine_dts_aws)
     SQLModel.metadata.create_all(bind=engine_azure)
+
+def run_on_dual_dts(logic_func):
+    """
+    Ejecuta una función lógica en la sesión local (DTS) y en la de AWS RDS.
+    Garantiza que el error en una no detenga a la otra (especialmente AWS).
+    """
+    results = []
+    
+    # 1. Ejecución Local (Principal)
+    try:
+        with next(get_dts_session()) as session:
+            results.append(logic_func(session))
+    except Exception as e:
+        print(f"[DATABASE DUAL] Error en base de datos LOCAL (DTS): {e}")
+        # Si la local falla, usualmente queremos que el error suba
+        raise e
+        
+    # 2. Replicación en AWS RDS
+    try:
+        with next(get_dts_aws_session()) as session:
+            results.append(logic_func(session))
+            print("[DATABASE DUAL] Replicacion exitosa en AWS RDS.")
+    except Exception as e:
+        print(f"[DATABASE DUAL] Error en replicacion AWS RDS: {e}")
+        # No relanzamos para no interrumpir el flujo principal
+        
+    return results[0] if results else None
 
 
 # ============================================================================

@@ -179,20 +179,15 @@ def conciliation_data(from_date, to_date):
         df2_valid = df2.dropna(subset=['FECHA'])
         df1_valid = df1.dropna(subset=['Fecha'])
         
-        # insertar datos del collector (Nuvei)
-        print(f"[DEBUG] Insertando {len(df2_valid)} registros de Nuvei")
-        if len(df2_valid) > 0:
-            with next(get_dts_session()) as session:
+        # Insertar datos del collector y Calimaco de forma dual
+        def initial_save(session):
+            print(f"[DEBUG] Insertando registros de Nuvei y Calimaco")
+            if len(df2_valid) > 0:
                 bulk_upsert_collector_records_optimized(session, df2_valid, 6)  
-        else:
-            print("[WARN] No hay registros válidos de Nuvei para insertar")
-
-        # Insertar datos de Calimaco
-        if len(df1_valid) > 0:
-            with next(get_dts_session()) as session:
+            if len(df1_valid) > 0:
                 bulk_upsert_calimaco_records_optimized(session, df1_valid, 6) 
-        else:
-            print("[WARN] No hay registros válidos de Calimaco para insertar")
+                
+        run_on_dual_dts(initial_save)
         
 
         cols_calimaco = [
@@ -344,33 +339,35 @@ def conciliation_data(from_date, to_date):
         from_date_fmt = from_date.date()
         to_date_fmt = to_date.date()  
         
-        # Insertar en la base de datos las rutas finales
-        with next(get_dts_session()) as session:
-                conciliation_id = insert_conciliations(
-                    6,
-                    session,
-                    1,
-                    from_date_fmt,
-                    to_date_fmt,
-                    metricas["recaudacion_calimaco"],
-                    metricas["recaudacion_nuvei"],
-                    metricas["aprobados_calimaco"],
-                    metricas["aprobados_nuvei"],
-                    metricas["no_conciliados_calimaco"],
-                    metricas["no_conciliados_nuvei"],
-                    metricas["no_conciliados_monto_calimaco"],
-                    metricas["no_conciliados_monto_nuvei"],
-                )
-                insert_conciliation_files(
-                    session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{new_calimaco_key}"
-                )
-                insert_conciliation_files(
-                    session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{new_nuvei_key}"
-                )
-                insert_conciliation_files(
-                    session, conciliation_id, 2, f"s3://{Config.S3_BUCKET}/{output_key}"
-                )
-                session.commit()
+        # Insertar en la base de datos las rutas finales de forma dual
+        def final_save(session):
+            conciliation_id = insert_conciliations(
+                6,
+                session,
+                1,
+                from_date_fmt,
+                to_date_fmt,
+                metricas["recaudacion_calimaco"],
+                metricas["recaudacion_nuvei"],
+                metricas["aprobados_calimaco"],
+                metricas["aprobados_nuvei"],
+                metricas["no_conciliados_calimaco"],
+                metricas["no_conciliados_nuvei"],
+                metricas["no_conciliados_monto_calimaco"],
+                metricas["no_conciliados_monto_nuvei"],
+            )
+            insert_conciliation_files(
+                session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{new_calimaco_key}"
+            )
+            insert_conciliation_files(
+                session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{new_nuvei_key}"
+            )
+            insert_conciliation_files(
+                session, conciliation_id, 2, f"s3://{Config.S3_BUCKET}/{output_key}"
+            )
+            session.commit()
+
+        run_on_dual_dts(final_save)
                 
         print(f"[SUCCESS] Conciliacion completada exitosamente: {output_key}")
         return True      
@@ -413,24 +410,16 @@ def updated_data_nuvei():
         df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])   
         
-        # insertar datos del collector (Nuvei)
-        print(f"[DEBUG] Insertando {len(df2)} registros de Nuvei")
-        if len(df2) > 0:
-            with next(get_dts_session()) as session:
+        # insertar datos y actualizar timestamp de forma dual
+        def update_save(session):
+            print(f"[DEBUG] Insertando registros de Nuvei y Calimaco (Update)")
+            if len(df2) > 0:
                 bulk_upsert_collector_records_optimized(session, df2, 6)  
-        else:
-            print("[WARN] No hay registros válidos de Nuvei para insertar")
-
-        # Insertar datos de Calimaco
-        if len(df1) > 0:
-            with next(get_dts_session()) as session:
+            if len(df1) > 0:
                 bulk_upsert_calimaco_records_optimized(session, df1, 6) 
-        else:
-            print("[WARN] No hay registros válidos de Calimaco para insertar")
-
-        # actualizar timestamp del collector
-        with next(get_dts_session()) as session:
             update_collector_timestamp(session, 6) 
+
+        run_on_dual_dts(update_save)
 
         # eliminar archivos procesados
         delete_file_from_s3(nuvei_key)

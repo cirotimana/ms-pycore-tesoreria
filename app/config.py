@@ -45,6 +45,13 @@ class Config:
     DB_PORT_DTS = os.getenv("DB_PORT_DTS")
     DB_NAME_DTS = os.getenv("DB_NAME_DTS")
 
+    # ALERTAS AWS RDS
+    DB_USER_DTS_AWS = os.getenv("DB_USER_DTS_AWS", "")
+    DB_PASSWORD_DTS_AWS = os.getenv("DB_PASS_DTS_AWS", "") # El usuario usó DB_PASS_DTS_AWS
+    DB_HOST_DTS_AWS = os.getenv("DB_HOST_DTS_AWS")
+    DB_PORT_DTS_AWS = os.getenv("DB_PORT_DTS_AWS")
+    DB_NAME_DTS_AWS = os.getenv("DB_NAME_DTS_AWS")
+
     # IMAP CCTV
     IMAP_HOST_CCTV = os.getenv("IMAP_HOST_CCTV")
     IMAP_PORT_CCTV = os.getenv("IMAP_PORT_CCTV")

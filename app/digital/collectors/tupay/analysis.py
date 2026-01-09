@@ -156,13 +156,12 @@ def conciliation_data(from_date, to_date):
         df2 = df2[df2['ESTADO PROVEEDOR'].isin(['COMPLETED'])].drop_duplicates(subset=['ID CALIMACO'], keep='first')
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
 
-        # Insertar datos del collector (Tupay)
-        with next(get_dts_session()) as session:
+        # Insertar datos del collector y Calimaco de forma dual
+        def initial_save(session):
             bulk_upsert_collector_records_optimized(session, df2, 9)  
-
-        # Insertar datos de Calimaco
-        with next(get_dts_session()) as session:
             bulk_upsert_calimaco_records_optimized(session, df1, 9)  
+        
+        run_on_dual_dts(initial_save)
         
 
         cols_calimaco = [
@@ -321,33 +320,35 @@ def conciliation_data(from_date, to_date):
         to_date_fmt = to_date.date()  
 
 
-        # Insertar en la db
-        with next(get_dts_session()) as session:
-                conciliation_id = insert_conciliations(
-                    9,
-                    session,
-                    1,
-                    from_date_fmt,
-                    to_date_fmt,
-                    metricas["recaudacion_calimaco"],
-                    metricas["recaudacion_tupay"],
-                    metricas["aprobados_calimaco"],
-                    metricas["aprobados_tupay"],
-                    metricas["no_conciliados_calimaco"],
-                    metricas["no_conciliados_tupay"],
-                    metricas["no_conciliados_monto_calimaco"],
-                    metricas["no_conciliados_monto_tupay"],
-                )
-                insert_conciliation_files(
-                    session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{new_calimaco_key}"
-                )
-                insert_conciliation_files(
-                    session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{new_tupay_key}"
-                )
-                insert_conciliation_files(
-                    session, conciliation_id, 2, f"s3://{Config.S3_BUCKET}/{output_key}"
-                )
-                session.commit() 
+        # Insertar en la db de forma dual
+        def final_save(session):
+            conciliation_id = insert_conciliations(
+                9,
+                session,
+                1,
+                from_date_fmt,
+                to_date_fmt,
+                metricas["recaudacion_calimaco"],
+                metricas["recaudacion_tupay"],
+                metricas["aprobados_calimaco"],
+                metricas["aprobados_tupay"],
+                metricas["no_conciliados_calimaco"],
+                metricas["no_conciliados_tupay"],
+                metricas["no_conciliados_monto_calimaco"],
+                metricas["no_conciliados_monto_tupay"],
+            )
+            insert_conciliation_files(
+                session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{new_calimaco_key}"
+            )
+            insert_conciliation_files(
+                session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{new_tupay_key}"
+            )
+            insert_conciliation_files(
+                session, conciliation_id, 2, f"s3://{Config.S3_BUCKET}/{output_key}"
+            )
+            session.commit() 
+
+        run_on_dual_dts(final_save)
                 
         print(f"[SUCCESS] Conciliación completada exitosamente: {output_key}")
         return True        
@@ -394,16 +395,13 @@ def updated_data_tupay():
         df2 = df2[df2['ESTADO PROVEEDOR'].isin(['COMPLETED'])].drop_duplicates(subset=['ID CALIMACO'], keep='first')
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
         
-        # insertar datos en base de datos
-        with next(get_dts_session()) as session:
+        # insertar datos y actualizar timestamp de forma dual
+        def update_save(session):
             bulk_upsert_collector_records_optimized(session, df2, 9)
-
-        with next(get_dts_session()) as session:
             bulk_upsert_calimaco_records_optimized(session, df1, 9)  
-            
-        # actualizar timestamp del collector
-        with next(get_dts_session()) as session:
             update_collector_timestamp(session, 9) 
+
+        run_on_dual_dts(update_save)
 
         # eliminar archivos procesados
         delete_file_from_s3(tupay_key)
