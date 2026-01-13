@@ -4,10 +4,10 @@ from datetime import datetime
 import pytz
 from app.common.database import get_dts_session, get_dts_aws_session
 
-from app.models.bot_executions import *
-from app.models.bots import *
-from app.models.cases import *
-from app.models.case_incident import *
+from app.models.tbl_bot_execution import *
+from app.models.tbl_bot import *
+from app.models.tbl_case import *
+from app.models.tbl_case_incident import *
 from app.digital.concentratorIP.concentratorIP_SQL import query_total_ip as query_ti
 from app.digital.concentratorIP.utils import *
 
@@ -51,8 +51,8 @@ def save_to_database(df, total_ip, total_registros):
             continue
 
 def insert_bot_execution(session, total_processed, total_detected):
-    """Insertar en Bot_Executions"""
-    bot_execution = Bot_Executions(
+    """Insertar en TblBotExecution"""
+    bot_execution = TblBotExecution(
         bot_id = 1,
         executed_at=datetime.now(pytz.timezone("America/Lima")),
         total_processed_records=int(total_processed),
@@ -64,11 +64,11 @@ def insert_bot_execution(session, total_processed, total_detected):
     return bot_execution.id
 
 def insert_case(session, execution_id, incident_count, ip):
-    """Insertr en Case"""
+    """Insertar en TblCase"""
     descripcion = (
         f"Concentracion de la IP {ip}, con {incident_count} registros en los ultimos 3 dias "
     )
-    case = Cases(
+    case = TblCase(
         execution_id=execution_id,
         capture_date=datetime.now(pytz.timezone("America/Lima")),
         description=descripcion,
@@ -80,7 +80,7 @@ def insert_case(session, execution_id, incident_count, ip):
     return case.id
 
 def insert_incidents(session, case_id, group):
-    """Insertar en Case_Incident"""
+    """Insertar en TblCaseIncident"""
 
 
     upsert_cliente_stmt = text("""
@@ -115,7 +115,7 @@ def insert_incidents(session, case_id, group):
         # insertar incidente
         ##safe_dict = convert_row_to_json_safe_dict(row)
         safe_dict = convert_row_to_json_safe_dict_exclude(row, exclude_cols)
-        incident = Case_Incident(
+        incident = TblCaseIncident(
             case_id=case_id,
             data_json=safe_dict,
             client_id=client_id,
@@ -125,8 +125,8 @@ def insert_incidents(session, case_id, group):
     session.commit()
         
 def update_bot_last_run(session):
-    """Actualiza Bots"""
-    bot = session.query(Bots).filter(Bots.id == 1).first()
+    """Actualiza TblBot"""
+    bot = session.query(TblBot).filter(TblBot.id == 1).first()
     if bot:
         bot.last_run = datetime.now(pytz.timezone("America/Lima"))
         session.commit()

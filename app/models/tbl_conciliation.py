@@ -4,8 +4,9 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-class Conciliations(Base):
-    __tablename__ = "conciliations"
+class TblConciliation(Base):
+    __tablename__ = "tbl_conciliation"
+    __table_args__ = {"schema": "sch_collectors"}
 
     id = Column(Integer, primary_key=True, index=True)
     collector_id = Column(Integer, nullable=False)
@@ -23,4 +24,8 @@ class Conciliations(Base):
     unreconciled_amount_collector = Column(Numeric(10, 2), nullable=True)
     conciliations_state = Column(Boolean, nullable=False)##eliminar
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(Integer, nullable=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_by = Column(Numeric, nullable=True) # bigint in sql
+    updated_by = Column(Numeric, nullable=True) # bigint in sql
+    activo = Column(Boolean, default=True, nullable=True)
+    delete_at = Column(DateTime(timezone=True), nullable=True)

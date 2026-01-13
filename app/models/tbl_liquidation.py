@@ -4,8 +4,9 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-class Liquidations(Base):
-    __tablename__ = "liquidations"
+class TblLiquidation(Base):
+    __tablename__ = "tbl_liquidation"
+    __table_args__ = {"schema": "sch_collectors"}
 
     id = Column(Integer, primary_key=True, index=True)
     collector_id = Column(Integer, nullable=False)
@@ -31,4 +32,6 @@ class Liquidations(Base):
     difference_amounts = Column(Numeric(10, 2), nullable=False)
     liquidations_state = Column(Boolean, nullable=False)##eliminar
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(Integer, nullable=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_by = Column(Numeric, nullable=True)
+    updated_by = Column(Numeric, nullable=True)
