@@ -208,12 +208,12 @@ def insert_conciliations(
     unreconciled_amount_calimaco,
     unreconciled_amount_collector
 ):
-    from app.models.conciliations import Conciliations
+    from app.models.tbl_conciliation import TblConciliation
     difference_amounts = abs(amounts - amount_collectors)
     conciliations_state = difference_amounts == 0
 
     try:
-        conciliations = Conciliations(
+        conciliations = TblConciliation(
             collector_id=int(collector),
             conciliations_type=int(conciliations_types),
             from_date=datetime.strptime(str(from_date), "%Y-%m-%d").date() if isinstance(from_date, str) else from_date,
@@ -230,6 +230,7 @@ def insert_conciliations(
             conciliations_state=bool(conciliations_state),
             created_at=datetime.now(pytz.timezone("America/Lima")),
             created_by=1,
+            activo=True,
         )
         session.add(conciliations)
         session.commit()
@@ -241,9 +242,9 @@ def insert_conciliations(
 
 
 def insert_conciliation_files(session, conciliation_ids, conciliations_file_types, file_paths):
-    from app.models.conciliation_files import ConciliationFiles
+    from app.models.tbl_conciliation_file import TblConciliationFile
     try:
-        conciliation_files = ConciliationFiles(
+        conciliation_files = TblConciliationFile(
             conciliation_id=int(conciliation_ids),
             conciliation_files_type=int(conciliations_file_types),
             file_path=str(file_paths),
@@ -278,12 +279,12 @@ def insert_liquidations(
     unreconciled_amount_collector,
     unreconciled_amount_liquidation
 ):
-    from app.models.liquidations import Liquidations
+    from app.models.tbl_liquidation import TblLiquidation
     differenceAmounts = abs(amountCollector - amountLiquidation)
     liquidationsState = differenceAmounts == 0
 
     try:
-        liquidations = Liquidations(
+        liquidations = TblLiquidation(
             collector_id=int(collector),
             liquidations_type=int(liquidationsTypes),
             from_date=datetime.strptime(str(from_date), "%Y-%m-%d").date() if isinstance(from_date, str) else from_date,
@@ -317,9 +318,9 @@ def insert_liquidations(
 
 
 def insert_liquidation_files(session, liquidationIds, liquidationsFileTypes, filePaths):
-    from app.models.liquidation_files import LiquidationFiles
+    from app.models.tbl_liquidation_file import TblLiquidationFile
     try:
-        liquidation_files = LiquidationFiles(
+        liquidation_files = TblLiquidationFile(
             liquidation_id=int(liquidationIds),
             liquidation_files_type=int(liquidationsFileTypes),
             file_path=str(filePaths),
@@ -334,7 +335,7 @@ def insert_liquidation_files(session, liquidationIds, liquidationsFileTypes, fil
 
 
 def bulk_upsert_collector_records_optimized(session, df, collector_id):
-    from app.models.collector_records import CollectorRecords
+    from app.models.tbl_collector_record import TblCollectorRecord
     try:
         df_clean = df.copy()
         df_clean['collector_id'] = collector_id
@@ -358,13 +359,14 @@ def bulk_upsert_collector_records_optimized(session, df, collector_id):
         df_clean['client_name'] = df_clean['CLIENTE'].where(df_clean['CLIENTE'].notna(), None).astype(str)
         df_clean['amount'] = df_clean['MONTO'].apply(to_decimal)
         df_clean['provider_status'] = df_clean['ESTADO PROVEEDOR'].astype(str)
+        df_clean['activo'] = True
         
-        records = df_clean[['collector_id', 'record_date', 'calimaco_id', 'provider_id', 'client_name', 'amount', 'provider_status']].to_dict('records')
+        records = df_clean[['collector_id', 'record_date', 'calimaco_id', 'provider_id', 'client_name', 'amount', 'provider_status', 'activo']].to_dict('records')
         
         batch_size = 5000
         for i in range(0, len(records), batch_size):
             batch = records[i:i + batch_size]
-            stmt = insert(CollectorRecords).values(batch)
+            stmt = insert(TblCollectorRecord).values(batch)
             stmt = stmt.on_conflict_do_update(
                 index_elements=['collector_id', 'calimaco_id'],
                 set_={
@@ -387,7 +389,7 @@ def bulk_upsert_collector_records_optimized(session, df, collector_id):
 
 
 def bulk_upsert_calimaco_records_optimized(session, df, collector_id):
-    from app.models.calimaco_records import CalimacoRecords
+    from app.models.tbl_calimaco_record import TblCalimacoRecord
     try:
         df_clean = df.copy()
         collector_names = {
@@ -410,13 +412,14 @@ def bulk_upsert_calimaco_records_optimized(session, df, collector_id):
         df_valid['amount'] = df_valid['Cantidad'].apply(to_decimal)
         df_valid['external_id'] = df_valid['ID externo'].where(df_valid['ID externo'].notna(), None).astype(str)
         df_valid['comments'] = df_valid['Comentarios'].where(df_valid['Comentarios'].notna(), None).astype(str)
+        df_valid['activo'] = True
         
-        records = df_valid[['collector_id', 'calimaco_id', 'record_date', 'modification_date', 'status', 'user_id', 'amount', 'external_id', 'comments']].to_dict('records')
+        records = df_valid[['collector_id', 'calimaco_id', 'record_date', 'modification_date', 'status', 'user_id', 'amount', 'external_id', 'comments', 'activo']].to_dict('records')
         
         batch_size = 5000
         for i in range(0, len(records), batch_size):
             batch = records[i:i + batch_size]
-            stmt = insert(CalimacoRecords).values(batch)
+            stmt = insert(TblCalimacoRecord).values(batch)
             stmt = stmt.on_conflict_do_update(
                 index_elements=['collector_id', 'calimaco_id', 'status'],
                 set_={
@@ -440,11 +443,12 @@ def bulk_upsert_calimaco_records_optimized(session, df, collector_id):
 
 
 def update_collector_timestamp(session, collector_id):
-    from app.models.collectors import Collectors
+    from app.models.tbl_collector import TblCollector
     try:
+        # print(f"la fecha actual es : {datetime.now(pytz.timezone("America/Lima"))}")
         stmt = (
-            session.query(Collectors)
-            .filter(Collectors.id == collector_id)
+            session.query(TblCollector)
+            .filter(TblCollector.id == collector_id)
             .update({
                 'updated_at': datetime.now(pytz.timezone("America/Lima"))
             })
@@ -454,4 +458,5 @@ def update_collector_timestamp(session, collector_id):
     except Exception as e:
         session.rollback()
         raise
+
 

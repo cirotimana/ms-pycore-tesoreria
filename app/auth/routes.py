@@ -4,8 +4,8 @@ from sqlmodel import Session, select
 from app.auth.schemas import LoginRequest, LoginResponse, UserResponse
 from app.auth.utils import verify_password, create_access_token, get_token_expiration_seconds
 from app.auth.dependencies import get_current_active_user
-from app.models.user import User
-from app.common.database import get_dts_session
+from app.models.tbl_user import TblUser
+from app.common.database import get_dts_aws_session
 
 
 router = APIRouter()
@@ -13,9 +13,6 @@ router = APIRouter()
 
 @router.get("/debug-headers")
 def debug_headers(request: Request):
-    """
-    endpoint de debug para ver los headers recibidos
-    """
     headers = dict(request.headers)
     return {
         "headers": headers,
@@ -27,26 +24,27 @@ def debug_headers(request: Request):
 @router.post("/login", response_model=LoginResponse)
 def login(
     credentials: LoginRequest,
-    session: Session = Depends(get_dts_session)
+    session: Session = Depends(get_dts_aws_session) ###se cambio a _awv
 ):
     # buscar usuario por username
-    statement = select(User).where(
-        User.username == credentials.username,
-        User.is_active == True,
-        User.deleted_at.is_(None)
+    statement = select(TblUser).where(
+        TblUser.username == credentials.username,
+        TblUser.is_active == True,
+        TblUser.deleted_at.is_(None)
     )
     user = session.exec(statement).first()
 
     # verificar si el usuario existe
     if user is None:
+        # print("[LOGIN DEBUG] Fallo: Usuario no existe o inactivo")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="credenciales invalidas",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # verificar la contraseña
     if not verify_password(credentials.password, user.password):
+        print(f"[LOGIN DEBUG] Fallo: Contraseña incorrecta")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="credenciales invalidas",
@@ -71,7 +69,7 @@ def login(
 
 @router.get("/me", response_model=UserResponse, dependencies=[Depends(get_current_active_user)])
 def get_current_user_info(
-    current_user: User = Depends(get_current_active_user)
+    current_user: TblUser = Depends(get_current_active_user)
 ):
     return UserResponse(
         id=current_user.id,

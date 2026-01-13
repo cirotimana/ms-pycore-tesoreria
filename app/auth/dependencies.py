@@ -6,8 +6,8 @@ import logging
 
 from app.auth.utils import decode_access_token
 from app.auth.schemas import TokenData
-from app.models.user import User
-from app.common.database import get_dts_session
+from app.models.tbl_user import TblUser
+from app.common.database import get_dts_session, get_dts_aws_session ##get_dts_aws_session
 
 # configurar logger
 logger = logging.getLogger(__name__)
@@ -18,8 +18,8 @@ security = HTTPBearer(auto_error=True)
 
 def get_current_user_from_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    session: Session = Depends(get_dts_session)
-) -> User:
+    session: Session = Depends(get_dts_aws_session)  ### para que valide con usuarios en aws
+) -> TblUser:
 
     # obtener el token del header
     token = credentials.credentials
@@ -37,10 +37,10 @@ def get_current_user_from_token(
         )
 
     # buscar el usuario en la base de datos
-    statement = select(User).where(
-        User.id == token_data.user_id,
-        User.is_active == True,
-        User.deleted_at.is_(None)
+    statement = select(TblUser).where(
+        TblUser.id == token_data.user_id,
+        TblUser.is_active == True,
+        TblUser.deleted_at.is_(None)
     )
     user = session.exec(statement).first()
     logger.info(f"usuario encontrado: {user.username if user else 'none'}")
@@ -57,8 +57,8 @@ def get_current_user_from_token(
 
 
 def get_current_active_user(
-    current_user: User = Depends(get_current_user_from_token)
-) -> User:
+    current_user: TblUser = Depends(get_current_user_from_token)
+) -> TblUser:
     
     if not current_user.is_active:
         raise HTTPException(

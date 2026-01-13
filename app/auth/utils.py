@@ -1,22 +1,26 @@
-import hashlib
+
 import jwt
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from app.config import Config
 from app.auth.schemas import TokenData
 
+from passlib.context import CryptContext
 
 # constantes para jwt
 JWT_EXPIRATION_DAYS = 1  # token expira en 1 dia
 JWT_EXPIRATION_SECONDS = JWT_EXPIRATION_DAYS * 24 * 60 * 60  # 86400 segundos
 
+# configurar contexto de passlib para bcrypt
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return hash_password(plain_password) == hashed_password
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
