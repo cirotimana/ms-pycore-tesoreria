@@ -201,7 +201,8 @@ def get_pagoefectivo_liq(from_date , to_date):
         to_date_fmt = to_date.date()  
         
         # insertamos en la base de datos
-        with next(get_dts_session()) as session:
+        # insertamos en la base de datos (Dual: Local + AWS)
+        def save_conciliacion_logic(session):
             liquidation_id = insert_liquidations(
                 7,
                 session,
@@ -224,7 +225,6 @@ def get_pagoefectivo_liq(from_date , to_date):
                 metricas["nc_debito_liquidacion"],
                 metricas["nc_neto_pagoefectivo"],
                 metricas["nc_neto_liq"],
-                
             )
             insert_liquidation_files(
                 session, liquidation_id, 1, f"s3://{Config.S3_BUCKET}/{new_pagoefectivo_key}"
@@ -236,6 +236,8 @@ def get_pagoefectivo_liq(from_date , to_date):
                 session, liquidation_id, 2, f"s3://{Config.S3_BUCKET}/{output_key}"
             )
             session.commit()
+
+        run_on_dual_dts(save_conciliacion_logic)
 
         
         print(f"[SUCCESS] Conciliacion completada exitosamente: {output_key}")

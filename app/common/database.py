@@ -109,13 +109,9 @@ def create_all():
     SQLModel.metadata.create_all(bind=engine_azure)
 
 def run_on_dual_dts(logic_func):
-    """
-    Ejecuta una función lógica en la sesión local (DTS) y en la de AWS RDS.
-    Garantiza que el error en una no detenga a la otra (especialmente AWS).
-    """
     results = []
     
-    # 1. Ejecución Local (Principal)
+    # 1. ejecucion Local (principal)
     try:
         with next(get_dts_session()) as session:
             results.append(logic_func(session))
@@ -124,7 +120,7 @@ def run_on_dual_dts(logic_func):
         # Si la local falla, usualmente queremos que el error suba
         raise e
         
-    # 2. Replicación en AWS RDS
+    # 2. replicacion en AWS RDS
     try:
         with next(get_dts_aws_session()) as session:
             results.append(logic_func(session))
@@ -137,7 +133,7 @@ def run_on_dual_dts(logic_func):
 
 
 # ============================================================================
-# UTILIDADES DE CONVERSIÓN Y NORMALIZACIÓN
+# UTILIDADES DE CONVERSION Y NORMALIZACION
 # ============================================================================
 
 def to_decimal(value):
@@ -307,6 +303,7 @@ def insert_liquidations(
             liquidations_state=bool(liquidationsState),
             created_at=datetime.now(pytz.timezone("America/Lima")),
             created_by=1,
+            activo=True,
         )
         session.add(liquidations)
         session.commit()

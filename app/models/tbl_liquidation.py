@@ -35,3 +35,5 @@ class TblLiquidation(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     created_by = Column(Numeric, nullable=True)
     updated_by = Column(Numeric, nullable=True)
+    activo = Column(Boolean, default=True, nullable=True)
+    delete_at = Column(DateTime(timezone=True), nullable=True)
