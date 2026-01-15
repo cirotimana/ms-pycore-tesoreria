@@ -9,6 +9,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 2G
 
   api:
     container_name: api-ts
@@ -18,6 +22,12 @@ services:
       - "3023:8000"
     volumes:
       - .:/app
+
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
     env_file:

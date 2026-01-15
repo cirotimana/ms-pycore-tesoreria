@@ -243,7 +243,10 @@ paths = [
     "digital/collectors/yape/output", 
     "digital/collectors/yape/input",
     "digital/collectors/yape/calimaco/output",
-    "digital/collectors/yape/calimaco/input"
+    "digital/collectors/yape/calimaco/input",
+    "digital/collectors/kashio/liquidations/",
+    "digital/collectors/pagoefectivo/liquidations/",
+    "digital/collectors/tupay/liquidations/"
 ]
 
 if __name__ == "__main__":
