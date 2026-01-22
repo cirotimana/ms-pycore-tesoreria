@@ -144,6 +144,11 @@ def to_decimal(value):
     return Decimal(str(value))
 
 
+def sanitize_string_column(series):
+    s = series.astype(str)
+    return s.replace(['nan', 'NaN', 'None', '', 'None', 'nan', 'NaN'], None)
+
+
 def normalize_date_column(date_series, column_name="FECHA", collector_name="unknown"):
     if pd.api.types.is_datetime64_any_dtype(date_series):
         return date_series
@@ -349,11 +354,11 @@ def bulk_upsert_collector_records_optimized(session, df, collector_id):
         if len(df_clean) == 0:
             return
             
-        df_clean['calimaco_id'] = df_clean['ID CALIMACO'].astype(str)
-        df_clean['provider_id'] = df_clean['ID PROVEEDOR'].where(
-            (df_clean['ID PROVEEDOR'].notna()) & (df_clean['ID PROVEEDOR'] != '-'), None
-        ).astype(str)
-        df_clean['client_name'] = df_clean['CLIENTE'].where(df_clean['CLIENTE'].notna(), None).astype(str)
+        df_clean['calimaco_id'] = sanitize_string_column(df_clean['ID CALIMACO'])
+        df_clean['provider_id'] = df_clean['ID PROVEEDOR'].replace('-', None)
+        df_clean['provider_id'] = sanitize_string_column(df_clean['provider_id'])
+        
+        df_clean['client_name'] = sanitize_string_column(df_clean['CLIENTE'])
         df_clean['amount'] = df_clean['MONTO'].apply(to_decimal)
         df_clean['provider_status'] = df_clean['ESTADO PROVEEDOR'].astype(str)
         df_clean['activo'] = True
@@ -403,12 +408,12 @@ def bulk_upsert_calimaco_records_optimized(session, df, collector_id):
             return
             
         df_valid['collector_id'] = collector_id
-        df_valid['calimaco_id'] = df_valid['ID'].astype(str)
-        df_valid['status'] = df_valid['Estado'].astype(str)
-        df_valid['user_id'] = df_valid['Usuario'].where(df_valid['Usuario'].notna(), None).astype(str)
+        df_valid['calimaco_id'] = sanitize_string_column(df_valid['ID'])
+        df_valid['status'] = sanitize_string_column(df_valid['Estado'])
+        df_valid['user_id'] = sanitize_string_column(df_valid['Usuario'])
         df_valid['amount'] = df_valid['Cantidad'].apply(to_decimal)
-        df_valid['external_id'] = df_valid['ID externo'].where(df_valid['ID externo'].notna(), None).astype(str)
-        df_valid['comments'] = df_valid['Comentarios'].where(df_valid['Comentarios'].notna(), None).astype(str)
+        df_valid['external_id'] = sanitize_string_column(df_valid['ID externo'])
+        df_valid['comments'] = sanitize_string_column(df_valid['Comentarios'])
         df_valid['activo'] = True
         
         records = df_valid[['collector_id', 'calimaco_id', 'record_date', 'modification_date', 'status', 'user_id', 'amount', 'external_id', 'comments', 'activo']].to_dict('records')

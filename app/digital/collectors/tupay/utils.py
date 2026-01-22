@@ -273,7 +273,7 @@ def delete_all_tupay_emails():
         mail.login(Config.EMAIL_USER, Config.EMAIL_PASS)
         mail.select("inbox")
         
-        # Buscar todos los correos de Tupay (leidos y no leidos)
+        # buscar todos los correos de Tupay (leidos y no leidos)
         status, messages = mail.search(None, '(FROM "merchants@tupaypagos.com")')
         email_ids = messages[0].split()
         
@@ -282,21 +282,29 @@ def delete_all_tupay_emails():
             mail.logout()
             return True
         
-        print(f"[INFO] Eliminando {len(email_ids)} correo(s) de Tupay del inbox")
+        print(f"[INFO] Moviendo {len(email_ids)} correo(s) de Tupay a la Papelera")
         
-        # Marcar todos los correos para eliminacion
+        trash_folder = "[Gmail]/Trash" 
+        try:
+            mail.select(trash_folder)
+            mail.select("inbox")
+        except:
+            trash_folder = "[Gmail]/Papelera"
+
+        # mover correos a la papelera (Copy + Delete del Inbox)
         for email_id in email_ids:
+            mail.copy(email_id, trash_folder)
             mail.store(email_id, '+FLAGS', '\\Deleted')
         
-        # Eliminar permanentemente los correos marcados
+        # eliminar permanentemente los correos marcados del INBOX (ya estan copiados en Trash)
         mail.expunge()
         mail.logout()
         
-        print(f"[SUCCESS] {len(email_ids)} correo(s) eliminado(s) exitosamente")
+        print(f"[SUCCESS] {len(email_ids)} correo(s) movido(s) a {trash_folder} exitosamente")
         return True
         
     except Exception as e:
-        print(f"[ERROR] Error eliminando correos: {e}")
+        print(f"[ERROR] Error moviendo correos a papelera: {e}")
         return False
 
 
