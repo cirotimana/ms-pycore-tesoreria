@@ -11,8 +11,7 @@ def task_process_kashio(self, from_date, to_date):
     except Exception as e:
         print(f"[WORKER] Error en tarea Kashio: {e}")
         raise e
-    finally:
-        release_lock("kashio-process")
+
 
 @celery_app.task(bind=True, name="kashio.process_update")
 def task_process_updated_kashio(self):
@@ -23,5 +22,4 @@ def task_process_updated_kashio(self):
     except Exception as e:
         print(f"[WORKER] Error en tarea Kashio Update: {e}")
         raise e
-    finally:
-        release_lock("kashio-process")
+

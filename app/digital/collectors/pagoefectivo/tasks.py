@@ -11,8 +11,7 @@ def task_process_pagoefectivo(self, from_date, to_date):
     except Exception as e:
         print(f"[WORKER] Error en tarea PagoEfectivo: {e}")
         raise e
-    finally:
-        release_lock("pagoefectivo-process")
+
 
 @celery_app.task(bind=True, name="pagoefectivo.process_update")
 def task_process_updated_pagoefectivo(self):
@@ -23,5 +22,4 @@ def task_process_updated_pagoefectivo(self):
     except Exception as e:
         print(f"[WORKER] Error en tarea PagoEfectivo Update: {e}")
         raise e
-    finally:
-        release_lock("pagoefectivo-process")
+

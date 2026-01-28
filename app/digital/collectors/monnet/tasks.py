@@ -11,8 +11,7 @@ def task_process_monnet(self, from_date, to_date):
     except Exception as e:
         print(f"[WORKER] Error en tarea Monnet: {e}")
         raise e
-    finally:
-        release_lock("monnet-process")
+
 
 @celery_app.task(bind=True, name="monnet.process_update")
 def task_process_updated_monnet(self):
@@ -23,5 +22,4 @@ def task_process_updated_monnet(self):
     except Exception as e:
         print(f"[WORKER] Error en tarea Monnet Update: {e}")
         raise e
-    finally:
-        release_lock("monnet-process")
+

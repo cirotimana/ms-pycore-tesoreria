@@ -11,8 +11,7 @@ def task_process_kushki(self, from_date, to_date):
     except Exception as e:
         print(f"[WORKER] Error en tarea Kushki: {e}")
         raise e
-    finally:
-        release_lock("kushki-process")
+
 
 @celery_app.task(bind=True, name="kushki.process_update")
 def task_process_updated_kushki(self):
@@ -23,5 +22,4 @@ def task_process_updated_kushki(self):
     except Exception as e:
         print(f"[WORKER] Error en tarea Kushki Update: {e}")
         raise e
-    finally:
-        release_lock("kushki-process")
+

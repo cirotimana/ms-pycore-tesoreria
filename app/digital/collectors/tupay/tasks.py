@@ -11,8 +11,7 @@ def task_process_tupay(self, from_date, to_date):
     except Exception as e:
         print(f"[WORKER] Error en tarea Tupay: {e}")
         raise e
-    finally:
-        release_lock("tupay-process")
+
 
 @celery_app.task(bind=True, name="tupay.process_update")
 def task_process_updated_tupay(self):
@@ -23,5 +22,4 @@ def task_process_updated_tupay(self):
     except Exception as e:
         print(f"[WORKER] Error en tarea Tupay Update: {e}")
         raise e
-    finally:
-        release_lock("tupay-process")
+

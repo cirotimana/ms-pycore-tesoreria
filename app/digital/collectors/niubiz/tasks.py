@@ -11,8 +11,6 @@ def task_process_niubiz(self, from_date, to_date):
     except Exception as e:
         print(f"[WORKER] Error en tarea Niubiz: {e}")
         raise e
-    finally:
-        release_lock("niubiz-process")
 
 @celery_app.task(bind=True, name="niubiz.process_update")
 def task_process_updated_niubiz(self):
@@ -23,5 +21,3 @@ def task_process_updated_niubiz(self):
     except Exception as e:
         print(f"[WORKER] Error en tarea Niubiz Update: {e}")
         raise e
-    finally:
-        release_lock("niubiz-process")

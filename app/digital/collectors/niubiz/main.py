@@ -17,7 +17,7 @@ def get_main_niubiz(from_date = None, to_date = None):
     
     try:
         results = {
-            'niubiz': get_data_niubiz(from_date, to_date),
+            'niubiz': get_data_niubiz_1(from_date, to_date), ## se cambio a get_data_niubiz_1
             'calimaco': get_data_calimaco(from_date, to_date)
         }
         

@@ -11,5 +11,4 @@ def task_process_tupay_liq(self, from_date, to_date):
     except Exception as e:
         print(f"[WORKER] Error en tarea Tupay Liquidations: {e}")
         raise e
-    finally:
-        release_lock("tupay-process-liq")
+

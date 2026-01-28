@@ -130,25 +130,55 @@ def conciliation_data(from_date, to_date):
         calimaco_content = read_file_from_s3(calimaco_key)
         niubiz_content = read_file_from_s3(niubiz_key)
 
-        df1 = pd.read_csv(BytesIO(calimaco_content), dtype={'ID': str, 'Usuario': str, 'ID externo': str})
-        df2 = pd.read_csv(BytesIO(niubiz_content), dtype={'N°Voucher/Id pedido': str, 'ID operación': str})
+        # df1 = pd.read_csv(BytesIO(calimaco_content), dtype={'ID': str, 'Usuario': str, 'ID externo': str})
+        # df2 = pd.read_csv(BytesIO(niubiz_content), dtype={'N°Voucher/Id pedido': str, 'ID operación': str})
 
-        df2 = df2.rename(columns={'Fecha y hora de Transacción':'FECHA'})
-        df2 = df2.rename(columns={'N°Voucher/Id pedido':'ID CALIMACO'})
-        df2 = df2.rename(columns={'ID operación':'ID PROVEEDOR'})
-        df2['CLIENTE'] = '-'
-        df2 = df2.rename(columns={'Monto':'MONTO'})
-        df2 = df2.rename(columns={'Tipo operación':'ESTADO PROVEEDOR'})
+        # df2 = df2.rename(columns={'Fecha y hora de Transacción':'FECHA'})
+        # df2 = df2.rename(columns={'N°Voucher/Id pedido':'ID CALIMACO'})
+        # df2 = df2.rename(columns={'ID operación':'ID PROVEEDOR'})
+        # df2['CLIENTE'] = '-'
+        # df2 = df2.rename(columns={'Monto':'MONTO'})
+        # df2 = df2.rename(columns={'Tipo operación':'ESTADO PROVEEDOR'})
         
-        # Limpiar espacios en ID CALIMACO
+        # # Limpiar espacios en ID CALIMACO
+        # df2['ID CALIMACO'] = df2['ID CALIMACO'].astype(str).str.strip()
+        
+        # df1 = df1[["ID","Fecha","Fecha de modificación","Estado","Usuario","Cantidad","ID externo","Comentarios"]]
+        # df1['Data'] = "<==>"
+        # df2=df2[["FECHA","ID CALIMACO","ID PROVEEDOR","CLIENTE","MONTO","ESTADO PROVEEDOR",]]
+        
+        # df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
+        # df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
+
+        df1 = pd.read_csv(BytesIO(calimaco_content), dtype={'ID': str, 'Usuario': str, 'ID externo': str})
+        df2 = pd.read_csv(BytesIO(niubiz_content), dtype={'Nro Pedido': str})
+        
+        df2 = df2[df2['Estado'].isin(['Autorizada', 'Liquidada'])]
+        df2['Estado'] = df2['Estado'].replace({
+            'Autorizada': 'Venta',
+            'Liquidada': 'Venta'
+        })
+        
+        # aplicar formato y cambio de nombres de columnas
+        df2 = df2.rename(columns={'Fecha de Transacción':'FECHA'})
+        df2 = df2.rename(columns={'Nro Pedido':'ID CALIMACO'})
+        # df2 = df2.rename(columns={'ID operación':'ID PROVEEDOR'})
+        df2['ID PROVEEDOR'] = '-'
+        df2 = df2.rename(columns={'Cliente':'CLIENTE'})
+        df2 = df2.rename(columns={'Importe Pedido':'MONTO'})
+        df2 = df2.rename(columns={'Estado':'ESTADO PROVEEDOR'})
+        
+        # limpiar espacios en ID CALIMACO
         df2['ID CALIMACO'] = df2['ID CALIMACO'].astype(str).str.strip()
         
         df1 = df1[["ID","Fecha","Fecha de modificación","Estado","Usuario","Cantidad","ID externo","Comentarios"]]
         df1['Data'] = "<==>"
-        df2=df2[["FECHA","ID CALIMACO","ID PROVEEDOR","CLIENTE","MONTO","ESTADO PROVEEDOR",]]
+        df2 = df2[["FECHA","ID CALIMACO","ID PROVEEDOR","CLIENTE","MONTO","ESTADO PROVEEDOR"]]
         
+        # eliminar duplicados
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
         df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
+        
         
         # Insertar datos del collector y Calimaco de forma dual
         def initial_save(session):
@@ -185,8 +215,10 @@ def conciliation_data(from_date, to_date):
         conciliacion_cond1 = pd.merge(
         df1_cond1.assign(Numero_compra_temp=df1_cond1['ID'].str[2:]),
         df2_cond1,
-        left_on='Numero_compra_temp',
-        right_on='ID CALIMACO',
+        # left_on='Numero_compra_temp',
+        # right_on='ID CALIMACO',
+        left_on=['Numero_compra_temp', 'Cantidad'],
+        right_on=['ID CALIMACO', 'MONTO'],
         how='inner',
         indicator=False).drop('Numero_compra_temp', axis=1)
 
@@ -197,8 +229,10 @@ def conciliation_data(from_date, to_date):
         conciliacion_cond2 = pd.merge(
         df1_cond2.assign(Numero_compra_temp=df1_cond2['ID'].str[2:]),
         df2_cond2,
-        left_on='Numero_compra_temp',
-        right_on='ID CALIMACO',
+        # left_on='Numero_compra_temp',
+        # right_on='ID CALIMACO',
+        left_on=['Numero_compra_temp', 'Cantidad'],
+        right_on=['ID CALIMACO', 'MONTO'],
         how='inner',
         indicator=False).drop('Numero_compra_temp', axis=1)
         

@@ -17,9 +17,7 @@ def task_process_yape(self, from_date, to_date):
         print(f"[WORKER] Error en tarea Yape: {e}")
         # Re-raise para que Celery marque la tarea como FAILED
         raise e
-    finally:
-        # Liberar el lock de Redis al terminar
-        release_lock("yape-process")
+
 
 @celery_app.task(bind=True, name="yape.process_update")
 def task_process_updated_yape(self):
@@ -30,6 +28,4 @@ def task_process_updated_yape(self):
     except Exception as e:
         print(f"[WORKER] Error en tarea Yape Update: {e}")
         raise e
-    finally:
-        # Liberar el lock de Redis al terminar
-        release_lock("yape-process")
+
