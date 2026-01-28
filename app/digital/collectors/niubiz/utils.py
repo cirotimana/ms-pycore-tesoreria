@@ -774,7 +774,10 @@ async def get_data_json_niubiz_async(token, from_date, to_date):
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
-        "Authorization": token
+        "Authorization": token,
+        "Origin": "https://comercio.niubiz.com.pe",
+        "Referer": "https://comercio.niubiz.com.pe/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
     url = "https://api.niubiz.pe/api.backoffice.merchant/order"
     size = 10000  
@@ -854,8 +857,8 @@ async def get_data_json_niubiz_async(token, from_date, to_date):
                         print(f"[ERROR] Error de autorizacion (401) en pagina {page}. Intento {attempt + 1}/{max_retries}")
                         if attempt < max_retries - 1:
                             print("[INFO] Intentando renovar token Niubiz...")
-                            # CORREGIDO: await en lugar de asyncio.run()
-                            new_token = await token_cache_niubiz.get_token(force_refresh=True)
+                            # CORREGIDO: await, type=1 para asegurar que sea el token correcto
+                            new_token = await token_cache_niubiz.get_token(force_refresh=True, type=1)
                             if new_token:
                                 current_token = new_token
                                 headers["Authorization"] = current_token

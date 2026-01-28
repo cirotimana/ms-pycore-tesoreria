@@ -179,8 +179,10 @@ def conciliation_data(from_date, to_date):
         conciliacion_cond1 = pd.merge(
         df1_cond1.assign(Numero_compra_temp=df1_cond1['ID'].str[2:]),
         df2_cond1,
-        left_on='Numero_compra_temp',
-        right_on='ID CALIMACO',
+        # left_on='Numero_compra_temp',
+        # right_on='ID CALIMACO',
+        left_on=['Numero_compra_temp', 'Cantidad'],
+        right_on=['ID CALIMACO', 'MONTO'],
         how='inner',
         indicator=False).drop('Numero_compra_temp', axis=1)
 
@@ -191,8 +193,8 @@ def conciliation_data(from_date, to_date):
         conciliacion_cond2 = pd.merge(
         df1_cond2.assign(Numero_compra_temp=df1_cond2['ID'].str[2:]),
         df2_cond2,
-        left_on='Numero_compra_temp',
-        right_on='ID CALIMACO',
+        left_on=['Numero_compra_temp', 'Cantidad'],
+        right_on=['ID CALIMACO', 'MONTO'],
         how='inner',
         indicator=False).drop('Numero_compra_temp', axis=1)
         

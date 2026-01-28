@@ -31,9 +31,8 @@ def redis_lock(lock_name_prefix: str, expire: int = 14400):
             
             try:
                 return func(*args, **kwargs)
-            except Exception as e:
+            finally:
                 redis_client.delete(lock_key)
-                raise e
         return wrapper
     return decorator
 

@@ -15,8 +15,7 @@ def task_process_nuvei(self, from_date, to_date):
     except Exception as e:
         print(f"[WORKER] Error en tarea Nuvei: {e}")
         raise e
-    finally:
-        release_lock("nuvei-process")
+
 
 @celery_app.task(bind=True, name="nuvei.process_update")
 def task_process_updated_nuvei(self):
@@ -29,5 +28,4 @@ def task_process_updated_nuvei(self):
     except Exception as e:
         print(f"[WORKER] Error en tarea Nuvei Update: {e}")
         raise e
-    finally:
-        release_lock("nuvei-process")
+

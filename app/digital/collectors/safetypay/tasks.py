@@ -11,8 +11,7 @@ def task_process_safetypay(self, from_date, to_date):
     except Exception as e:
         print(f"[WORKER] Error en tarea SafetyPay: {e}")
         raise e
-    finally:
-        release_lock("safetypay-process")
+
 
 @celery_app.task(bind=True, name="safetypay.process_update")
 def task_process_updated_safetypay(self):
@@ -23,5 +22,4 @@ def task_process_updated_safetypay(self):
     except Exception as e:
         print(f"[WORKER] Error en tarea SafetyPay Update: {e}")
         raise e
-    finally:
-        release_lock("safetypay-process")
+
