@@ -6,7 +6,7 @@ Base = declarative_base()
 class TblCollectorRecord(Base):
     __tablename__ = "tbl_collector_record"
     __table_args__ = (
-        UniqueConstraint('collector_id', 'calimaco_id', name='unique_collector_id_calimaco'),
+        UniqueConstraint('collector_id', 'calimaco_id', 'amount', name='unique_collector_id_calimaco'),
         {"schema": "sch_collectors"}
     )
 
