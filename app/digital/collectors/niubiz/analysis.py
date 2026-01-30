@@ -177,7 +177,7 @@ def conciliation_data(from_date, to_date):
         
         # eliminar duplicados
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
-        df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
+        df2 = df2.drop_duplicates(subset=['ID CALIMACO', 'MONTO'], keep='first')
         
         
         # Insertar datos del collector y Calimaco de forma dual
@@ -239,7 +239,7 @@ def conciliation_data(from_date, to_date):
         
         #condicion 3 _ duplicados niubiz
         df2_cond3 = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
-        duplicados_df2 = df2_cond3[df2_cond3.duplicated(subset=['ID CALIMACO'], keep=False)]
+        duplicados_df2 = df2_cond3[df2_cond3.duplicated(subset=['ID CALIMACO', 'MONTO'], keep=False)]
         
         
         # condicion 4 _ registros aprovados que no hicieron match
@@ -248,8 +248,8 @@ def conciliation_data(from_date, to_date):
         no_match = pd.merge(
         df1_cond4.assign(Numero_compra_temp=df1_cond4['ID'].str[2:]),
         df2_cond4,
-        left_on='Numero_compra_temp',
-        right_on='ID CALIMACO',
+        left_on=['Numero_compra_temp', 'Cantidad'],
+        right_on=['ID CALIMACO', 'MONTO'],
         how='outer',
         indicator=True).drop('Numero_compra_temp', axis=1)
         
@@ -513,4 +513,4 @@ def get_data_niubiz_1(from_date, to_date):
 
 
 if __name__ == "__main__":
-    updated_data_niubiz()
+    conciliation_data()
