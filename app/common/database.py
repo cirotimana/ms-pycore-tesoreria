@@ -111,23 +111,24 @@ def create_all():
 def run_on_dual_dts(logic_func):
     results = []
     
-    # 1. ejecucion Local (principal)
-    try:
-        with next(get_dts_session()) as session:
-            results.append(logic_func(session))
-    except Exception as e:
-        print(f"[DATABASE DUAL] Error en base de datos LOCAL (DTS): {e}")
-        # Si la local falla, usualmente queremos que el error suba
-        raise e
+    # 1. ejecucion Local (principal) -- DISABLED
+    # try:
+    #     with next(get_dts_session()) as session:
+    #         results.append(logic_func(session))
+    # except Exception as e:
+    #     print(f"[DATABASE DUAL] Error en base de datos LOCAL (DTS): {e}")
+    #     # Si la local falla, usualmente queremos que el error suba
+    #     raise e
         
-    # 2. replicacion en AWS RDS
+    # 2. ejecucion en AWS RDS (Ahora PRINCIPAL)
     try:
         with next(get_dts_aws_session()) as session:
-            results.append(logic_func(session))
-            print("[DATABASE DUAL] Replicacion exitosa en AWS RDS.")
+            result = logic_func(session)
+            results.append(result)
+            print("[DATABASE INSERT] Ejecucion exitosa en AWS RDS.")
     except Exception as e:
-        print(f"[DATABASE DUAL] Error en replicacion AWS RDS: {e}")
-        # No relanzamos para no interrumpir el flujo principal
+        print(f"[DATABASE INSERT] Error en AWS RDS: {e}")
+        raise e
         
     return results[0] if results else None
 
@@ -365,12 +366,11 @@ def bulk_upsert_collector_records_optimized(session, df, collector_id):
             batch = records[i:i + batch_size]
             stmt = insert(TblCollectorRecord).values(batch)
             stmt = stmt.on_conflict_do_update(
-                index_elements=['collector_id', 'calimaco_id'],
+                index_elements=['collector_id', 'calimaco_id', 'amount'],
                 set_={
                     'record_date': stmt.excluded.record_date,
                     'provider_id': stmt.excluded.provider_id,
                     'client_name': stmt.excluded.client_name,
-                    'amount': stmt.excluded.amount,
                     'provider_status': stmt.excluded.provider_status, 
                     'updated_at': func.now()
                 }
