@@ -1,6 +1,6 @@
 import pandas as pd
 import pytz
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.digital.collectors.tupay.utils import *
 from app.digital.collectors.tupay.email_handler import *
 from app.common.database import *
@@ -27,9 +27,9 @@ def get_data_tupay(from_date, to_date):
                 try:
                     content = read_file_from_s3(s3_key)
                     df = pd.read_csv(BytesIO(content), dtype={'Reference': str, 'Invoice': str, 'Bank Reference' : str, 'Client Document' : str })
-                    df['Creation Date'] = pd.to_datetime(df['Creation Date'], errors='coerce', dayfirst=True, format="mixed") - timedelta(hours=5)
-                    df['Last Change Date'] = pd.to_datetime(df['Last Change Date'], errors='coerce', dayfirst=True, format="mixed") - timedelta(hours=5)
-                    df['Expiration Date'] = pd.to_datetime(df['Expiration Date'], errors='coerce', dayfirst=True, format="mixed") - timedelta(hours=5)
+                    # df['Creation Date'] = pd.to_datetime(df['Creation Date'], errors='coerce', dayfirst=True, format="mixed") - timedelta(hours=5)
+                    # df['Last Change Date'] = pd.to_datetime(df['Last Change Date'], errors='coerce', dayfirst=True, format="mixed") - timedelta(hours=5)
+                    # df['Expiration Date'] = pd.to_datetime(df['Expiration Date'], errors='coerce', dayfirst=True, format="mixed") - timedelta(hours=5)
                     
                     if 'Invoice' in df.columns:
                             df['Invoice'] = (
@@ -143,6 +143,7 @@ def conciliation_data(from_date, to_date):
         df2 = pd.read_csv(BytesIO(tupay_content), encoding='utf-8', low_memory=False, dtype={'Reference': str, 'Invoice': str, 'Bank Reference' : str, 'Client Document' : str})
         
         df2 = df2.rename(columns={'Creation Date':'FECHA'})
+        df2['FECHA'] = (pd.to_datetime(df2['FECHA'], errors='coerce') - timedelta(hours=5)).dt.strftime("%d/%m/%Y %H:%M:%S").fillna("")
         df2 = df2.rename(columns={'Invoice':'ID CALIMACO'})
         df2 = df2.rename(columns={'Reference':'ID PROVEEDOR'})
         df2 = df2.rename(columns={'Client Name':'CLIENTE'})
@@ -382,6 +383,7 @@ def updated_data_tupay():
         
         # aplicar formato y cambio de nombres de columnas
         df2 = df2.rename(columns={'Creation Date':'FECHA'})
+        df2['FECHA'] = (pd.to_datetime(df2['FECHA'], errors='coerce') - timedelta(hours=5)).dt.strftime("%d/%m/%Y %H:%M:%S").fillna("")
         df2 = df2.rename(columns={'Invoice':'ID CALIMACO'})
         df2 = df2.rename(columns={'Reference':'ID PROVEEDOR'})
         df2 = df2.rename(columns={'Client Name':'CLIENTE'})

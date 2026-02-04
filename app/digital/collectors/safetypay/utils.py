@@ -400,7 +400,12 @@ def json_excel_safetypay(from_date, to_date):
             for item in data:
                 row = {
                     "Estado": item.get("status", ""),
-                    "Fecha": item.get("date", ""),
+                    # ##"FECHA DE REGISTRO": (
+                    #     pd.to_datetime(item.get("created"), errors="coerce") - timedelta(hours=5)
+                    # ).strftime("%d/%m/%Y %H:%M:%S") if item.get("created") else ""
+                    "Fecha": (
+                        pd.to_datetime(item.get("date"), errors="coerce") - timedelta(hours=5)
+                    ).strftime("%d/%m/%Y %H:%M:%S") if item.get("date") else "", 
                     "Id. de operación": item.get("operationId", ""),
                     "Id. de transacción": item.get("transactionId", ""),
                     "Id. de ventas de comerciantes": item.get("merchantReferenceNo", ""),
@@ -430,7 +435,7 @@ def json_excel_safetypay(from_date, to_date):
                                     .str.replace('-', '.', regex=False)
                                     .astype(str))
 
-            df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce', dayfirst=True, format="mixed") - timedelta(hours=5)
+            # df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce', dayfirst=True, format="mixed") - timedelta(hours=5)
 
             column_order = [
                 "Estado",
@@ -450,12 +455,13 @@ def json_excel_safetypay(from_date, to_date):
             ]
             df = df[column_order]
             
+            print(f"[INFO] Se procesaron {len(df)} registros")
             # Filtrar por fecha
-            df_filtrado = df[(df['Fecha'] >= from_date_str) & (df['Fecha'] <= to_date_str)]
+            # df_filtrado = df[(df['Fecha'] >= from_date_str) & (df['Fecha'] <= to_date_str)]
 
             # Guardar Excel
             with BytesIO() as excel_buffer:
-                df_filtrado.to_excel(excel_buffer, index=False)
+                df.to_excel(excel_buffer, index=False)
                 excel_buffer.seek(0)
                 output_key = file_key.replace(".json", ".xlsx")
                 upload_file_to_s3(excel_buffer.getvalue(), output_key)
