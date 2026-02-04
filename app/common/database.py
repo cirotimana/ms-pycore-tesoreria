@@ -123,6 +123,7 @@ def run_on_dual_dts(logic_func):
     # 2. ejecucion en AWS RDS (Ahora PRINCIPAL)
     try:
         with next(get_dts_aws_session()) as session:
+            print("[DATABASE INSERT] Iniciando ejecucion en AWS RDS.")
             result = logic_func(session)
             results.append(result)
             print("[DATABASE INSERT] Ejecucion exitosa en AWS RDS.")
