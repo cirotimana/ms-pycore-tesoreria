@@ -205,9 +205,8 @@ def delete_files_in_paths_keeping_folders(paths: List[str]):
         except ClientError as e:
             print(f"[ALERTA] Error al limpiar ruta {prefix}: {e}")
 
-
-
-paths = [
+def clean_paths():
+    paths = [
     "digital/collectors/kashio/output", 
     "digital/collectors/kashio/input",
     "digital/collectors/kashio/calimaco/output",
@@ -247,7 +246,13 @@ paths = [
     "digital/collectors/kashio/liquidations/",
     "digital/collectors/pagoefectivo/liquidations/",
     "digital/collectors/tupay/liquidations/"
-]
+    ]
+
+    print("Iniciando limpiaza Diaria")
+    delete_files_in_paths_keeping_folders(paths)
+    print("Limpiaza Diaria completada")
+
+
 
 if __name__ == "__main__":
-    delete_files_in_paths_keeping_folders(paths)
+    clean_paths()

@@ -16,7 +16,7 @@ from app.digital.collectors.pagoefectivo.liquidations.main import get_main_pagoe
 from app.digital.collectors.safetypay.main import get_main_safetypay, get_updated_safetypay
 from app.digital.collectors.tupay.main import get_main_tupay, get_updated_tupay
 from app.digital.collectors.tupay.liquidations.main import get_main_tupay_liq
-
+from app.common.s3_utils import clean_paths
 
 from app.config import Config
 
@@ -321,3 +321,13 @@ def cron_liquidation_pagoefectivo():
         else:
             print(f"Error en el cron de liq Pagoefectivo: {e}")
 
+
+
+## limpiar los path al minuto 59 todos los dias
+@repeat_at(cron="59 * * * *")
+def clean_paths_daily():
+    try:
+        print("Ejecutando limpieza de paths...")
+        clean_paths()
+    except Exception as e:
+        print(f"Error en la limpieza de paths: {e}")
