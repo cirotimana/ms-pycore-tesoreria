@@ -61,12 +61,13 @@ async def lifespan(app: FastAPI):
         cron_liquidation_kashio()
         cron_liquidation_pagoefectivo()
         cron_liquidation_tupay()
+        clean_paths_daily()
     yield
 
 # Crear una instancia de FastAPI, Swagger y OpenAPI
 app = FastAPI(
-    title="Backend Project API",
-    description="API AT.Pycore",
+    title="Backend Scraping Tesoreria",
+    description="API Scraping Tesoreria",
     lifespan=lifespan
 )
 
