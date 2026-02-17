@@ -361,7 +361,10 @@ def get_unread_tupay_link():
 
 def download_and_upload(link: str):
     try:
-        response = requests.get(link, stream=True, timeout=300)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
+        }
+        response = requests.get(link, stream=True, timeout=300, verify=False, allow_redirects=True, headers=headers)
         response.raise_for_status()
 
         current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
