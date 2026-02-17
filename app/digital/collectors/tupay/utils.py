@@ -11,6 +11,9 @@ import imaplib
 import email
 import re
 import html
+import subprocess
+import tempfile
+import os
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -359,24 +362,172 @@ def get_unread_tupay_link():
         return None
 
 
-def download_and_upload(link: str):
+def download_with_curl(link: str, output_path: str, timeout=300):
+    """
+    Descarga archivo usando curl como alternativa a requests.
+    Curl a veces maneja mejor los redirects y problemas de red.
+    
+    Args:
+        link: URL del archivo
+        output_path: Ruta donde guardar el archivo
+        timeout: Timeout en segundos
+    
+    Returns:
+        True si exitoso, False si falla
+    """
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
-        }
-        response = requests.get(link, stream=True, timeout=300, verify=False, allow_redirects=True, headers=headers)
-        response.raise_for_status()
-
-        current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
-        s3_key = f"digital/collectors/tupay/input/reporte_tupay_{current_time}.csv"
-
-        upload_file_to_s3(response.content, s3_key)
-        print(f"[SUCCESS] Archivo guardado en S3: {s3_key}")
-        return s3_key
+        print(f"[INFO] Intentando descarga con curl: {link}")
         
+        # Comando curl con opciones robustas
+        cmd = [
+            'curl',
+            '-L',  # Seguir redirects
+            '-k',  # Ignorar errores SSL
+            '--connect-timeout', '30',  # Timeout de conexion
+            '--max-time', str(timeout),  # Timeout total
+            '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',  # User-Agent
+            '-o', output_path,  # Output file
+            link
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 10)
+        
+        if result.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            print(f"[SUCCESS] Descarga exitosa con curl, tamaño: {os.path.getsize(output_path)} bytes")
+            return True
+        else:
+            print(f"[ERROR] Curl fallo con codigo: {result.returncode}")
+            if result.stderr:
+                print(f"[ERROR] Stderr: {result.stderr[:500]}")
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print(f"[ERROR] Curl timeout despues de {timeout}s")
+        return False
+    except FileNotFoundError:
+        print("[WARN] curl no esta disponible en el sistema")
+        return False
     except Exception as e:
-        print(f"[ERROR] Error descargando archivo: {e}")
-        return None
+        print(f"[ERROR] Error ejecutando curl: {e}")
+        return False
+
+
+def download_and_upload(link: str, max_retries=3):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive'
+    }
+    
+    for attempt in range(max_retries):
+        try:
+            print(f"[INFO] Intento de descarga {attempt + 1}/{max_retries} desde: {link}")
+            
+            # Usar Session para mejor manejo de conexiones
+            session = requests.Session()
+            session.verify = False
+            
+            # Timeout: (connect_timeout, read_timeout)
+            # connect_timeout: tiempo para establecer conexion (30s)
+            # read_timeout: tiempo para leer datos (300s = 5min)
+            response = session.get(
+                link, 
+                stream=True, 
+                timeout=(30, 300),  # (connect, read)
+                allow_redirects=True, 
+                headers=headers
+            )
+            response.raise_for_status()
+            
+            print(f"[INFO] Descarga exitosa, tamaño: {response.headers.get('content-length', 'desconocido')} bytes")
+            
+            current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
+            s3_key = f"digital/collectors/tupay/input/reporte_tupay_{current_time}.csv"
+            
+            upload_file_to_s3(response.content, s3_key)
+            print(f"[SUCCESS] Archivo guardado en S3: {s3_key}")
+            
+            session.close()
+            return s3_key
+            
+        except requests.exceptions.ConnectTimeout as e:
+            print(f"[ERROR] Timeout de conexion en intento {attempt + 1}/{max_retries}: {e}")
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 10  # Backoff: 10s, 20s, 30s
+                print(f"[INFO] Esperando {wait_time}s antes de reintentar...")
+                time.sleep(wait_time)
+            else:
+                print(f"[ERROR] Fallo despues de {max_retries} intentos - timeout de conexion")
+                return None
+                
+        except requests.exceptions.ReadTimeout as e:
+            print(f"[ERROR] Timeout de lectura en intento {attempt + 1}/{max_retries}: {e}")
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 10
+                print(f"[INFO] Esperando {wait_time}s antes de reintentar...")
+                time.sleep(wait_time)
+            else:
+                print(f"[ERROR] Fallo despues de {max_retries} intentos - timeout de lectura")
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] Error de red en intento {attempt + 1}/{max_retries}: {e}")
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 10
+                print(f"[INFO] Esperando {wait_time}s antes de reintentar...")
+                time.sleep(wait_time)
+            else:
+                print(f"[ERROR] Fallo despues de {max_retries} intentos - error de red")
+                return None
+                
+        except Exception as e:
+            print(f"[ERROR] Error descargando archivo: {e}")
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 10
+                print(f"[INFO] Esperando {wait_time}s antes de reintentar...")
+                time.sleep(wait_time)
+        finally:
+            try:
+                session.close()
+            except:
+                pass
+    
+    # Si requests fallo, intentar con curl como fallback
+    print("[INFO] Requests fallo, intentando metodo alternativo con curl...")
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp_file:
+            tmp_path = tmp_file.name
+        
+        if download_with_curl(link, tmp_path, timeout=300):
+            # Leer archivo descargado y subir a S3
+            with open(tmp_path, 'rb') as f:
+                file_content = f.read()
+            
+            current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
+            s3_key = f"digital/collectors/tupay/input/reporte_tupay_{current_time}.csv"
+            
+            upload_file_to_s3(file_content, s3_key)
+            print(f"[SUCCESS] Archivo guardado en S3 usando curl: {s3_key}")
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
+            
+            return s3_key
+        else:
+            print("[ERROR] Curl tambien fallo")
+            # Limpiar archivo temporal
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
+    except Exception as e:
+        print(f"[ERROR] Error en fallback curl: {e}")
+    
+    return None
 
 
 # =============================
