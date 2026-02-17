@@ -27,9 +27,6 @@ def get_data_tupay(from_date, to_date):
                 try:
                     content = read_file_from_s3(s3_key)
                     df = pd.read_csv(BytesIO(content), dtype={'Reference': str, 'Invoice': str, 'Bank Reference' : str, 'Client Document' : str })
-                    # df['Creation Date'] = pd.to_datetime(df['Creation Date'], errors='coerce', dayfirst=True, format="mixed") - timedelta(hours=5)
-                    # df['Last Change Date'] = pd.to_datetime(df['Last Change Date'], errors='coerce', dayfirst=True, format="mixed") - timedelta(hours=5)
-                    # df['Expiration Date'] = pd.to_datetime(df['Expiration Date'], errors='coerce', dayfirst=True, format="mixed") - timedelta(hours=5)
                     
                     if 'Invoice' in df.columns:
                             df['Invoice'] = (
