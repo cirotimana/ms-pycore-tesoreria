@@ -363,18 +363,6 @@ def get_unread_tupay_link():
 
 
 def download_with_curl(link: str, output_path: str, timeout=300):
-    """
-    Descarga archivo usando curl como alternativa a requests.
-    Curl a veces maneja mejor los redirects y problemas de red.
-    
-    Args:
-        link: URL del archivo
-        output_path: Ruta donde guardar el archivo
-        timeout: Timeout en segundos
-    
-    Returns:
-        True si exitoso, False si falla
-    """
     try:
         print(f"[INFO] Intentando descarga con curl: {link}")
         
@@ -458,8 +446,7 @@ def download_and_upload(link: str, max_retries=3):
                 print(f"[INFO] Esperando {wait_time}s antes de reintentar...")
                 time.sleep(wait_time)
             else:
-                print(f"[ERROR] Fallo despues de {max_retries} intentos - timeout de conexion")
-                return None
+                print(f"[WARN] Fallo despues de {max_retries} intentos con requests - intentando curl...")
                 
         except requests.exceptions.ReadTimeout as e:
             print(f"[ERROR] Timeout de lectura en intento {attempt + 1}/{max_retries}: {e}")
@@ -468,8 +455,7 @@ def download_and_upload(link: str, max_retries=3):
                 print(f"[INFO] Esperando {wait_time}s antes de reintentar...")
                 time.sleep(wait_time)
             else:
-                print(f"[ERROR] Fallo despues de {max_retries} intentos - timeout de lectura")
-                return None
+                print(f"[WARN] Fallo despues de {max_retries} intentos con requests - intentando curl...")
                 
         except requests.exceptions.RequestException as e:
             print(f"[ERROR] Error de red en intento {attempt + 1}/{max_retries}: {e}")
@@ -478,8 +464,7 @@ def download_and_upload(link: str, max_retries=3):
                 print(f"[INFO] Esperando {wait_time}s antes de reintentar...")
                 time.sleep(wait_time)
             else:
-                print(f"[ERROR] Fallo despues de {max_retries} intentos - error de red")
-                return None
+                print(f"[WARN] Fallo despues de {max_retries} intentos con requests - intentando curl...")
                 
         except Exception as e:
             print(f"[ERROR] Error descargando archivo: {e}")
