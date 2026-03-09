@@ -2,7 +2,7 @@ from datetime import datetime
 import pytz
 import os
 from app.config import Config
-from app.common.mail import send_mail, sendMailOffice365
+from app.common.mail import sendMailOffice365
 
 def send_email_with_results(df, total_dni, output_dir):
     """Envia un correo con los resultados del analisis"""
@@ -136,7 +136,6 @@ def send_email_with_results(df, total_dni, output_dir):
     """
     
     # enviar correo
-    # send_mail(subject, mensaje_html, recipients, [csv_file_path])
     sendMailOffice365(Config.SMTP_USER, subject, mensaje_html, recipients, [csv_file_path])
     
     
@@ -151,5 +150,4 @@ def send_empty_results_email(total_dni):
         <p>Total de registros analizados: {total_dni}</p>
         </body></html>
     """
-    # send_mail(subject, mensaje_html, recipients)
     sendMailOffice365(Config.SMTP_USER, subject, mensaje_html, recipients)

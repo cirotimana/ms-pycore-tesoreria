@@ -9,11 +9,21 @@ def get_main_kashio(from_date = None, to_date = None):
         from_date = now - timedelta(days=1)
         to_date = from_date
     else:
-        fmt = '%d%m%Y' if len(from_date) == 8 else '%d%m%y'
-        from_date = datetime.strptime(from_date, fmt).replace(tzinfo=lima_tz)
-        to_date = datetime.strptime(to_date, fmt).replace(tzinfo=lima_tz)
-        
-    print(f"[DEBUG] Enviando fechas from_date : {from_date} , to_date : {to_date}")
+        try:
+            fmt = '%d%m%Y' if len(from_date) == 8 else '%d%m%y'
+            from_date = datetime.strptime(from_date, fmt).replace(tzinfo=lima_tz)
+            to_date = datetime.strptime(to_date, fmt).replace(tzinfo=lima_tz)
+        except Exception as e:
+            print(f"[error] formato de fecha invalido en main kashio: {e}")
+            return {"success": False, "message": "formato de fecha invalido"}
+
+    # validar rango maximo de 10 dias (conteo inclusivo)
+    valid, from_date, to_date = validate_date_range(from_date, to_date)
+    if not valid:
+        return {"success": False, "message": "rango o formato invalido"}
+
+    days_diff = (to_date.replace(tzinfo=None) - from_date.replace(tzinfo=None)).days + 1
+    print(f"[debug] enviando fechas from_date : {from_date} , to_date : {to_date} ({days_diff} dias)")
     
     try:
         results = {
@@ -26,42 +36,42 @@ def get_main_kashio(from_date = None, to_date = None):
         else:
             results['conciliation'] = False
         
-        print(f"[DEBUG] Resultados: Kashio={results['kashio']}, Calimaco={results['calimaco']}, Conciliacion={results['conciliation']}")
+        print(f"[debug] resultados: kashio={results['kashio']}, calimaco={results['calimaco']}, conciliacion={results['conciliation']}")
     
         all_success = all(results.values())
     
         if all_success:
-            print("Todas las operaciones completadas exitosamente")
+            print("todas las operaciones completadas exitosamente")
             return {
                 "success": True,
-                "message": "Todas las operaciones completadas exitosamente",
+                "message": "todas las operaciones completadas exitosamente",
                 "failed_operations": []
             }
         else:
             
             failed_operations = []
             if not results['kashio']:
-                failed_operations.append("Kashio - Error en la descarga de datos")
+                failed_operations.append("kashio - error en la descarga de datos")
             if not results['calimaco']:
-                failed_operations.append("Calimaco - Error en la descarga de datos")
+                failed_operations.append("calimaco - error en la descarga de datos")
             if not results['conciliation']:
-                failed_operations.append("Conciliacion - No se pudo realizar la conciliacion")
+                failed_operations.append("conciliacion - no se pudo realizar la conciliacion")
             
-            print(f"Operaciones fallidas: {failed_operations}")
+            print(f"operaciones fallidas: {failed_operations}")
             return {
                 "success": False,
-                "message": "Algunas operaciones fallaron",
+                "message": "algunas operaciones fallaron",
                 "failed_operations": failed_operations,
                 "successful_operations": [op for op, success in results.items() if success]
             }
         
     except Exception as e:
-        error_message = f"Error en get_main: {e}"
+        error_message = f"error en get_main: {e}"
         print(error_message)
         return {
             "success": False,
             "message": error_message,
-            "failed_operations": ["Error general en el proceso"],
+            "failed_operations": ["error general en el proceso"],
             "successful_operations": []
         }
 
@@ -70,7 +80,7 @@ def get_updated_kashio():
     lima_tz = pytz.timezone("America/Lima")
     now = datetime.now(lima_tz)
     
-    print(f"[DEBUG] Enviando fechas from_date : {now} , to_date : {now}")
+    print(f"[debug] enviando fechas from_date : {now} , to_date : {now}")
     
     try:
         results = {
@@ -83,42 +93,42 @@ def get_updated_kashio():
         else:
             results['updated'] = False
         
-        print(f"[DEBUG] Resultados: Kashio={results['kashio']}, Calimaco={results['calimaco']}, Updated={results['updated']}")
+        print(f"[debug] resultados: kashio={results['kashio']}, calimaco={results['calimaco']}, updated={results['updated']}")
     
         all_success = all(results.values())
     
         if all_success:
-            print("Todas las operaciones completadas exitosamente")
+            print("todas las operaciones completadas exitosamente")
             return {
                 "success": True,
-                "message": "Todas las operaciones completadas exitosamente",
+                "message": "todas las operaciones completadas exitosamente",
                 "failed_operations": []
             }
         else:
             
             failed_operations = []
             if not results['kashio']:
-                failed_operations.append("Kashio - Error en la descarga de datos")
+                failed_operations.append("kashio - error en la descarga de datos")
             if not results['calimaco']:
-                failed_operations.append("Calimaco - Error en la descarga de datos")
+                failed_operations.append("calimaco - error en la descarga de datos")
             if not results['updated']:
-                failed_operations.append("Updated - No se pudo realizar la actualizacion")
+                failed_operations.append("updated - no se pudo realizar la actualizacion")
             
-            print(f"Operaciones fallidas: {failed_operations}")
+            print(f"operaciones fallidas: {failed_operations}")
             return {
                 "success": False,
-                "message": "Algunas operaciones fallaron",
+                "message": "algunas operaciones fallaron",
                 "failed_operations": failed_operations,
                 "successful_operations": [op for op, success in results.items() if success]
             }
         
     except Exception as e:
-        error_message = f"Error en get_main: {e}"
+        error_message = f"error en get_main: {e}"
         print(error_message)
         return {
             "success": False,
             "message": error_message,
-            "failed_operations": ["Error general en el proceso"],
+            "failed_operations": ["error general en el proceso"],
             "successful_operations": []
         }
         

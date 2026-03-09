@@ -9,6 +9,7 @@ from app.config import Config
 from io import BytesIO
 from app.common.s3_utils import *
 import time
+from contextlib import contextmanager
 
 
 # =============================
@@ -64,13 +65,13 @@ async def get_token_kashio():
             print("[INFO] Lanzando navegador para Kashio")
             browser = await p.chromium.launch(
                 headless=True,  
-                args=[
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage", 
-                    "--disable-gpu",
-                    "--no-zygote",
-                    "--single-process",
-                ]
+                # args=[
+                #     "--no-sandbox",
+                #     "--disable-dev-shm-usage", 
+                #     "--disable-gpu",
+                #     "--no-zygote",
+                #     "--single-process",
+                # ]
             )
             
             context = await browser.new_context(
@@ -253,32 +254,17 @@ async def close_playwright_resources_kashio(browser, context, page):
 # =============================
 #   FUNCIONES DE DATOS 
 # =============================
-async def get_data_json_kashio_async(token, from_date, to_date):
-    start_date = from_date
-    end_date = to_date + timedelta(days=1)
-    
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": token
-    }
-    
-    url = "https://ns10-api-web-extranet.kashio.com.pe/kcms/v1/customers/cus_TZgE7VA6xSxTjmN8eutJcm/payments"
-    limit = 500
-
-    total_data = 0
-    current_token = token
-
-    current_day = start_date
-    while current_day < end_date:
-        print(f"[INFO] Descargando transacciones para {current_day.date()}")
+async def download_day_data(current_day, headers, url, limit, semaphore):
+    # funcion auxiliar para descargar la data de un solo dia con paginacion y limite de concurrencia
+    async with semaphore:
+        print(f"[info] iniciando descarga para {current_day.date()} (concurrencia controlada)")
         
         from_dt = current_day.replace(hour=5, minute=0, second=0)
         to_dt = (current_day + timedelta(days=1)).replace(hour=5, minute=0, second=0)
         from_date_str = from_dt.strftime("%Y-%m-%d %H:%M:%S")
         to_date_str = to_dt.strftime("%Y-%m-%d %H:%M:%S")
         
-        all_data = []
+        all_day_data = []
         offset = 0
         has_more_data = True
         
@@ -296,20 +282,17 @@ async def get_data_json_kashio_async(token, from_date, to_date):
             
             for retry in range(max_retries):
                 try:
-                    response = requests.get(url, headers=headers, params=params, timeout=500)
+                    # usamos to_thread para evitar bloquear el event loop con requests (que es sincrono)
+                    response = await asyncio.to_thread(requests.get, url, headers=headers, params=params, timeout=500)
                     
                     if response.status_code == 200:
                         data = response.json()
-                        if isinstance(data, dict) and 'data' in data:
-                            registros = data['data']
-                        else:
-                            registros = data
+                        registros = data.get('data') if isinstance(data, dict) and 'data' in data else data
                             
                         if registros:
-                            all_data.extend(registros)
-                            print(f"[INFO] Descargados {len(registros)} registros (offset {offset})")
+                            all_day_data.extend(registros)
+                            print(f"[info] {current_day.date()} | descargados {len(registros)} registros (offset {offset})")
                             
-                            # Verificar si hay mas datos
                             if len(registros) < limit:
                                 has_more_data = False
                             else:
@@ -318,150 +301,197 @@ async def get_data_json_kashio_async(token, from_date, to_date):
                             success = True
                             break
                         else:
-                            print(f"[INFO] No hay mas registros para {current_day.date()}")
+                            print(f"[info] {current_day.date()} | no hay más registros")
                             has_more_data = False
                             success = True
                             break
                             
                     elif response.status_code in [401, 403]:
-                        print(f"[ERROR] Error de autorizacion {response.status_code}")
-                        if retry < max_retries - 1:
-                            new_token = await token_cache_kashio.get_token(force_refresh=True)
-                            if new_token:
-                                current_token = new_token
-                                headers["Authorization"] = current_token
-                                print("[INFO] Token renovado para descarga")
-                            else:
-                                print("[ERROR] No se pudo renovar token")
-                        break
+                        print(f"[error] {current_day.date()} | error de autorizacion {response.status_code}")
+                        return None
                         
                     elif response.status_code in [502, 504]:
-                        print(f"[WARN] Error {response.status_code} en offset {offset}, reintento {retry + 1}")
-                        if retry < max_retries - 1:
-                            await asyncio.sleep(5)
-                        else:
-                            has_more_data = False
-                            break
-                            
+                        wait_time = (retry + 1) * 10 # exponencial basico
+                        print(f"[warn] {current_day.date()} | error {response.status_code}, reintento {retry + 1}, esperando {wait_time}s")
+                        await asyncio.sleep(wait_time)
                     else:
-                        print(f"[ERROR] Status {response.status_code}: {response.text[:200]}")
+                        print(f"[error] {current_day.date()} | status {response.status_code}: {response.text[:100]}")
                         has_more_data = False
                         break
                         
                 except Exception as e:
-                    print(f"[ERROR] Excepcion durante descarga: {e}")
+                    print(f"[error] {current_day.date()} | excepcion: {e}")
                     if retry < max_retries - 1:
-                        await asyncio.sleep(5)
+                        await asyncio.sleep(10)
                     else:
                         has_more_data = False
                         break
             
             if not success:
-                print(f"[ERROR] No se pudo descargar datos para offset {offset}")
                 break
-            
-            # Pequena pausa entre requests
+                
             if has_more_data:
                 await asyncio.sleep(1)
         
-        print(f"[INFO] Descarga completa para {current_day.date()}, total registros: {len(all_data)}")
-        total_data += len(all_data)
-        
-        # Guardar datos del dia
-        if all_data:
+        if all_day_data:
             current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
-            file_key = f"digital/collectors/kashio/input/response_{current_time}.json"
-            upload_file_to_s3(json.dumps(all_data, ensure_ascii=False).encode("utf-8"), file_key)
-            print(f"[SUCCESS] Archivo guardado en S3: {file_key}")
-            
-        current_day += timedelta(days=1)
+            ms = datetime.now().strftime('%f')
+            file_key = f"digital/collectors/kashio/input/response_{current_time}_{ms}.json"
+            upload_file_to_s3(json.dumps(all_day_data, ensure_ascii=False).encode("utf-8"), file_key)
+            print(f"[success] {current_day.date()} | guardado en s3: {file_key}")
+            return len(all_day_data)
         
-        # Pausa entre dias
-        if current_day < end_date:
-            await asyncio.sleep(2)
-            
-    print(f"[INFO] Total general de registros descargados: {total_data}")
-    return total_data, current_token
+        return 0
+
+
+async def get_data_json_kashio_async(token, from_date, to_date):
+    start_date = from_date
+    end_date = to_date + timedelta(days=1)
+    
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": token
+    }
+    
+    url = "https://ns10-api-web-extranet.kashio.com.pe/kcms/v1/customers/cus_TZgE7VA6xSxTjmN8eutJcm/payments"
+    limit = 500
+    
+    # limitamos la concurrencia a 2 solicitudes simultaneas para evitar saturar el servidor (error 504)
+    semaphore = asyncio.Semaphore(2)
+
+    days_to_process = []
+    current_day = start_date
+    while current_day < end_date:
+        days_to_process.append(current_day)
+        current_day += timedelta(days=1)
+
+    print(f"[info] iniciando descarga controlada para {len(days_to_process)} dias (max 2 hilos)")
+    
+    tasks = [download_day_data(day, headers, url, limit, semaphore) for day in days_to_process]
+    results = await asyncio.gather(*tasks)
+    
+    total_records = sum(r for r in results if r is not None)
+    
+    print(f"[info] total general de registros descargados: {total_records}")
+    return total_records, token
+
+
+async def process_single_json_file(s3_key, s3_client):
+    # funcion auxiliar para procesar un solo json a excel en paralelo
+    try:
+        print(f"[info] procesando {s3_key}...")
+        content = read_file_from_s3(s3_key)
+        data = json.loads(content.decode("utf-8"))
+
+        if not data:
+            print(f"[warn] archivo vacio: {s3_key}")
+            return False
+
+        # Transformar los datos para el DataFrame
+        rows = []
+        for item in data:
+            invoice = item.get("invoice_list", [{}])[0] if item.get("invoice_list") else {}
+            row = {
+                "FECHA DE REGISTRO": (
+                    pd.to_datetime(item.get("created"), errors="coerce") - timedelta(hours=5)
+                ).strftime("%d/%m/%Y %H:%M:%S") if item.get("created") else "",
+                "REFERENCIA DE PAGO": item.get("reference", ""),
+                "CLIENTE": item.get("customer", {}).get("name", ""),
+                "REFERENCIA DE ORDEN": invoice.get("external_id", ""),
+                "DESCRIPCION": invoice.get("name", ""),
+                "SUBTOTAL": invoice.get("sub_total", {}).get("value", ""),
+                "MORA": invoice.get("late_fee", {}).get("value", ""),
+                "TOTAL": invoice.get("total", {}).get("value", ""),
+                "METODO DE PAGO": item.get("metadata", {}).get("psp_account", {}).get("name", ""),
+                "OPERACION": "Pago",
+                "ESTADO": item.get("status", "")
+            }
+            rows.append(row)
+        
+        df = pd.DataFrame(rows)
+
+        # Limpiar referencia de orden
+        df['REFERENCIA DE ORDEN'] = (
+            df['REFERENCIA DE ORDEN']
+            .str.replace('-ATP', '', regex=False)
+            .str.replace('-', '.', regex=False)
+        )
+
+        column_order = [
+            "FECHA DE REGISTRO", "REFERENCIA DE PAGO", "CLIENTE", "REFERENCIA DE ORDEN",
+            "DESCRIPCION", "SUBTOTAL", "MORA", "TOTAL", "METODO DE PAGO", "OPERACION", "ESTADO"
+        ]
+        df = df[column_order]
+
+        excel_key = s3_key.replace(".json", ".xlsx")
+
+        with bytes_io_context() as buffer:
+            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False)
+            buffer.seek(0)
+            upload_file_to_s3(buffer.getvalue(), excel_key)
+
+        # mover a processed
+        processed_key = s3_key.replace("/input/", "/input/processed/", 1)
+        s3_client.copy_object(
+            Bucket=Config.S3_BUCKET,
+            CopySource={"Bucket": Config.S3_BUCKET, "Key": s3_key},
+            Key=processed_key,
+        )
+        delete_file_from_s3(s3_key)
+        print(f"[success] procesado: {s3_key} -> {excel_key}")
+        return True
+    except Exception as e:
+        print(f"[error] error procesando {s3_key}: {e}")
+        return False
+
+
+async def json_excel_kashio_async():
+    # version asincrona para procesar archivos en paralelo
+    try:
+        s3_prefix = "digital/collectors/kashio/input/"
+        s3_files = list_files_in_s3(s3_prefix)
+        s3_client = get_s3_client_with_role()
+
+        files_to_process = [
+            f for f in s3_files 
+            if f.endswith(".json") and "/input/processed/" not in f
+        ]
+
+        if not files_to_process:
+            print("[info] no hay archivos json para procesar")
+            return
+
+        print(f"[info] procesando {len(files_to_process)} archivos en paralelo...")
+        tasks = [process_single_json_file(f, s3_client) for f in files_to_process]
+        await asyncio.gather(*tasks)
+        
+        print("[success] proceso json -> excel completado")
+    except Exception as e:
+        print(f"[error] error en json_excel_kashio: {e}")
+
+
+@contextmanager
+def bytes_io_context():
+    buffer = BytesIO()
+    try:
+        yield buffer
+    finally:
+        buffer.close()
 
 
 def json_excel_kashio():
-    
-    prefix = "digital/collectors/kashio/input/"
-    files = list_files_in_s3(prefix)
-    
-    processed_count = 0
-
-    for file_key in files:
-        if not file_key.endswith(".json"):
-            continue
-        
-        if "/input/processed/" in file_key:
-            continue  
-
-        print(f"[INFO] Procesando {file_key}...")
-        try:
-            content = read_file_from_s3(file_key)
-            data = json.loads(content.decode("utf-8"))
-
-            if isinstance(data, dict):
-                data = data.get("data") or data.get("results") or data.get("invoices") or []
-            
-            rows = []
-            
-            for item in data:
-                invoice = item.get("invoice_list", [{}])[0] if item.get("invoice_list") else {}
-                row = {
-                    "FECHA DE REGISTRO": (
-                        pd.to_datetime(item.get("created"), errors="coerce") - timedelta(hours=5)
-                    ).strftime("%d/%m/%Y %H:%M:%S") if item.get("created") else "",
-                    "REFERENCIA DE PAGO": item.get("reference", ""),
-                    "CLIENTE": item.get("customer", {}).get("name", ""),
-                    "REFERENCIA DE ORDEN": invoice.get("external_id", ""),
-                    "DESCRIPCION": invoice.get("name", ""),
-                    "SUBTOTAL": invoice.get("sub_total", {}).get("value", ""),
-                    "MORA": invoice.get("late_fee", {}).get("value", ""),
-                    "TOTAL": invoice.get("total", {}).get("value", ""),
-                    "METODO DE PAGO": item.get("metadata", {}).get("psp_account", {}).get("name", ""),
-                    "OPERACION": "Pago",
-                    "ESTADO": item.get("status", "")
-                }
-                rows.append(row)
-                
-            df = pd.DataFrame(rows)
-
-            # Limpiar referencia de orden
-            df['REFERENCIA DE ORDEN'] = (
-                df['REFERENCIA DE ORDEN']
-                .str.replace('-ATP', '', regex=False)
-                .str.replace('-', '.', regex=False)
-            )
-
-            column_order = [
-                "FECHA DE REGISTRO", "REFERENCIA DE PAGO", "CLIENTE", "REFERENCIA DE ORDEN",
-                "DESCRIPCION", "SUBTOTAL", "MORA", "TOTAL", "METODO DE PAGO", "OPERACION", "ESTADO"
-            ]
-            df = df[column_order]
-
-            # Guardar Excel
-            with BytesIO() as excel_buffer:
-                df.to_excel(excel_buffer, index=False)
-                excel_buffer.seek(0)
-                output_key = file_key.replace(".json", ".xlsx")
-                upload_file_to_s3(excel_buffer.getvalue(), output_key)
-                
-            # Mover JSON a processed
-            processed_key = file_key.replace("input/", "input/processed/", 1)
-            upload_file_to_s3(content, processed_key)
-            delete_file_from_s3(file_key)
-
-            processed_count += 1
-            print(f"[SUCCESS] Procesado: {file_key} -> {output_key}")
-
-        except Exception as e:
-            print(f"[ERROR] Error procesando {file_key}: {e}")
-            continue
-
-    print(f"[INFO] Proceso JSON -> Excel completado. Archivos procesados: {processed_count}")
+    # wrapper sincrono para mantener compatibilidad
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # si ya estamos en un loop (como en get_data_main_async), usamos un task
+            asyncio.create_task(json_excel_kashio_async())
+        else:
+            asyncio.run(json_excel_kashio_async())
+    except Exception as e:
+        print(f"[error] error al lanzar json_excel_kashio: {e}")
 
 
 # =============================
@@ -471,29 +501,75 @@ async def get_data_main_async(from_date, to_date):
     try:
         print(f"[INICIO] Procesando Kashio desde {from_date} hasta {to_date}")
         
-        # Obtener token del cache
+        # obtener token del cache
         token = await token_cache_kashio.get_token()
         if not token:
-            print("[ERROR] No se pudo obtener token de Kashio")
+            print("[error] no se pudo obtener token de kashio")
             return False
 
-        # Descargar datos
+        # descargar datos en paralelo
         data_count, final_token = await get_data_json_kashio_async(token, from_date, to_date)
         
         if data_count and data_count > 0:
-            print(f"[INFO] {data_count} registros descargados, generando archivo Excel")
-            json_excel_kashio()
-            print("[SUCCESS] Proceso Kashio completado exitosamente")
+            print(f"[info] {data_count} registros descargados, generando archivo excel")
+            await json_excel_kashio_async()
+            print("[success] proceso kashio completado exitosamente")
             return True
         else:
-            print("[INFO] No hay datos para procesar")
+            print("[info] no hay datos para procesar")
             return False
         
     except Exception as e:
-        print(f"[ERROR] Error en get_data_main_async: {e}")
+        print(f"[error] error en get_data_main_async: {e}")
         return False
 
 
 def get_data_main(from_date, to_date):
-    print(f"[WRAPPER] Ejecutando Kashio collector")
-    return asyncio.run(get_data_main_async(from_date, to_date))
+    # wrapper que asegura el formato de fechas y valida el rango de 10 dias
+    start_time = time.time()
+    
+    valid, from_date, to_date = validate_date_range(from_date, to_date)
+    if not valid:
+        return False
+
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso kashio | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*50}\n")
+    
+    try:
+        result = asyncio.run(get_data_main_async(from_date, to_date))
+    except Exception as e:
+        print(f"[error] fallo ejecucion principal kashio: {e}")
+        result = False
+    finally:
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        
+        print(f"\n{'='*50}")
+        print(f"[fin] proceso kashio completado")
+        print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+        print(f"{'='*50}\n")
+    
+    return result
+
+def validate_date_range(from_date, to_date):
+    try:
+        if isinstance(from_date, str):
+            from_date = datetime.strptime(from_date, "%Y-%m-%d")
+        if isinstance(to_date, str):
+            to_date = datetime.strptime(to_date, "%Y-%m-%d")
+    except Exception as e:
+        print(f"[error] formato de fecha invalido en kashio: {e}")
+        return False, None, None
+
+    # validar rango maximo de 10 dias (conteo inclusivo)
+    try:
+        days_diff = (to_date.replace(tzinfo=None) - from_date.replace(tzinfo=None)).days + 1
+        if days_diff > 10:
+            print(f"[error] kashio: el rango solicitado ({days_diff} dias) excede el maximo de 10 dias")
+            return False, None, None
+    except Exception as e:
+        print(f"[error] calculando el rango en kashio: {e}")
+        return False, None, None
+    
+    return True, from_date, to_date

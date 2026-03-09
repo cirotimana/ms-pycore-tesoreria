@@ -4,12 +4,17 @@ from datetime import datetime, date
 from app.digital.collectors.kashio.utils import *
 from app.digital.collectors.kashio.email_handler import *
 from app.common.database import *
-from app.common.database import get_dts_session
 from app.common.s3_utils import *
 from app.digital.collectors.calimaco.main import *
 import pytz
 
+
 def get_data_kashio(from_date, to_date):
+    # obtiene datos de kashio validando el rango de fechas
+    valid, from_date, to_date = validate_date_range(from_date, to_date)
+    if not valid:
+        return False
+
     s3_client = get_s3_client_with_role()
     try:
         get_data_main(from_date, to_date)
@@ -34,8 +39,7 @@ def get_data_kashio(from_date, to_date):
 
                         dataframes.append(df)
 
-                    # Mover a processed
-                    # delete_file_from_s3(s3_key)
+                    # mover a procesados
                     if "/input/" in s3_key and "/input/processed/" not in s3_key:
                         new_key = s3_key.replace("/input/", "/input/processed/", 1)
                         s3_client.copy_object(
@@ -46,7 +50,7 @@ def get_data_kashio(from_date, to_date):
                         delete_file_from_s3(s3_key)
 
                 except Exception as e:
-                    print(f"[✖] Error al procesar {s3_key}: {e}")
+                    print(f"[error] error al procesar {s3_key}: {e}")
 
         if dataframes:
             consolidated_df = pd.concat(dataframes, ignore_index=True)
@@ -75,10 +79,20 @@ def get_data_kashio(from_date, to_date):
 
 
 def get_data_calimaco(from_date, to_date):
+    # obtiene datos de calimaco validando el rango de fechas
+    valid, from_date, to_date = validate_date_range(from_date, to_date)
+    if not valid:
+        return False
+
     try:
         method = "KASHIO"
         collector = "kashio"
         calimaco_key = get_main_data(from_date, to_date, method, collector)
+        
+        if not calimaco_key:
+            print("[error] no se obtuvo el archivo de calimaco")
+            return False
+
         calimaco_content = read_file_from_s3(calimaco_key)
 
         df = pd.read_csv(BytesIO(calimaco_content),encoding="utf-8",low_memory=False,dtype={"ID": str, "Usuario": str, "ID externo": str})
@@ -103,11 +117,16 @@ def get_data_calimaco(from_date, to_date):
         return True
 
     except Exception as e:
-        print(f"[✖] Error en get_data_calimaco: {e}")
+        print(f"[error] error en get_data_calimaco: {e}")
         return False
 
 
 def conciliation_data(from_date, to_date):
+    # realiza la conciliacion validando el rango de fechas
+    valid, from_date, to_date = validate_date_range(from_date, to_date)
+    if not valid:
+        return False
+
     try:
 
         s3_client = get_s3_client_with_role()
@@ -118,13 +137,13 @@ def conciliation_data(from_date, to_date):
         kashio_key = get_latest_file_from_s3(kashio_prefix)
 
         if not calimaco_key or not kashio_key:
-            print("No se encontraron archivos para conciliar")
+            print("[info] no se encontraron archivos para conciliar")
             return False
 
-        print(f"[INFO] Procesando archivo Calimaco: {calimaco_key}")
-        print(f"[INFO] Procesando archivo Kashio: {kashio_key}")
+        print(f"[info] procesando archivo calimaco: {calimaco_key}")
+        print(f"[info] procesando archivo kashio: {kashio_key}")
 
-        # Leer archivos directamente desde S3
+        # leer archivos directamente desde s3
         calimaco_content = read_file_from_s3(calimaco_key)
         kashio_content = read_file_from_s3(kashio_key)
 
@@ -147,7 +166,7 @@ def conciliation_data(from_date, to_date):
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
         df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
         
-        # Insertar datos del collector y Calimaco de forma dual
+        # insertar datos del collector y calimaco de forma dual
         def initial_save(session):
             bulk_upsert_collector_records_optimized(session, df2, 1)  
             bulk_upsert_calimaco_records_optimized(session, df1, 1)  
@@ -225,7 +244,7 @@ def conciliation_data(from_date, to_date):
         # Filtrar solo los que estan solo en uno de los dos
         no_match_filtrado = no_match[no_match["Recaudador Aprobado"].isin(["Calimaco Aprobado", "Kashio Aprobado"])]
 
-        # Guardar resultado en S3
+        # guardar resultado en s3
         current_time = datetime.now(pytz.timezone("America/Lima")).strftime("%Y%m%d%H%M%S")
         output_key = f"digital/apps/total-secure/conciliaciones/processed/Kashio_Conciliacion_Ventas_{current_time}.xlsx"
 
@@ -269,8 +288,7 @@ def conciliation_data(from_date, to_date):
         for k, v in metricas.items():
             print(f"- {k}: {v}")
 
-        # Mover archivos y obtener las rutas finales
-        # Kashio
+        # mover archivos y obtener las rutas finales
         new_kashio_key = kashio_key.replace("/output/", "/output/processed/", 1)
         s3_client.copy_object(
             Bucket=Config.S3_BUCKET,
@@ -279,7 +297,7 @@ def conciliation_data(from_date, to_date):
         )
         delete_file_from_s3(kashio_key)
 
-        # Calimaco
+        # calimaco
         new_calimaco_key = calimaco_key.replace("/output/", "/output/processed/", 1)
         s3_client.copy_object(
             Bucket=Config.S3_BUCKET,
@@ -288,16 +306,16 @@ def conciliation_data(from_date, to_date):
         )
         delete_file_from_s3(calimaco_key)
 
-        # Enviar correo
-        print("[INFO] Enviando correo con resultados")
-        period_email = f"{from_date.strftime("%Y/%m/%d")} - {to_date.strftime("%Y/%m/%d")}"
+        # enviar correo
+        print("[info] enviando correo con resultados")
+        period_email = f"{from_date.strftime('%Y/%m/%d')} - {to_date.strftime('%Y/%m/%d')}"
         send_email_with_results(output_key, metricas, period_email)
         
         # convierte ambas a date (YYYY-MM-DD)
         from_date_fmt = from_date.date()
         to_date_fmt = to_date.date()  
 
-        # Insertar en la base de datos las rutas finales de forma dual
+        # insertar en la base de datos las rutas finales de forma dual
         def final_save(session):
             conciliation_id = insert_conciliations(
                 1,
@@ -390,5 +408,10 @@ def updated_data_kashio():
         return True
   
     except Exception as e:
-        print(f"[ERROR] Error en updated_data_kashio: {e}")
+        print(f"[error] error en updated_data_kashio: {e}")
         return False
+
+
+if __name__ == "__main__":
+    # ejecucion de prueba
+    get_data_kashio("2026-02-28", "2026-03-09")

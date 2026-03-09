@@ -1,5 +1,4 @@
 import os
-os.chdir('data')
 import base64
 import smtplib
 import requests
@@ -9,36 +8,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
 
-
-def send_mail(asunto, mensajeBody, destinatarios, archivos_adjuntos=None):    
-    mensaje = MIMEMultipart('alternative')
-    mensaje['From'] = Config.REMITENTE
-    mensaje['To'] = ', '.join(destinatarios)
-    mensaje['Subject'] = asunto
-
-    mensaje.attach(MIMEText(mensajeBody, 'html'))
-
-    # Adjuntar archivos desde memoria o ruta local
-    if archivos_adjuntos:
-        for archivo in archivos_adjuntos:
-            if isinstance(archivo, tuple):
-                # (filename, content)
-                filename, content = archivo
-                adjunto_mime = MIMEApplication(content)
-                adjunto_mime.add_header('Content-Disposition', 'attachment', filename=filename)
-                mensaje.attach(adjunto_mime)
-            else:
-                with open(archivo, 'rb') as adjunto:
-                    adjunto_mime = MIMEApplication(adjunto.read())
-                    adjunto_mime.add_header('Content-Disposition', 'attachment', filename=os.path.basename(archivo))
-                    mensaje.attach(adjunto_mime)
-
-    server = smtplib.SMTP(Config.SMTP_SERVER, Config.SMTP_PORT)
-    server.starttls()
-    server.login(Config.SMTP_USER, Config.SMTP_PASSWORD)
-    mensaje_texto = mensaje.as_string()
-    server.sendmail(Config.REMITENTE, destinatarios, mensaje_texto)
-    server.quit()
 
 def sendMailOffice365(remitente, asunto, mensajeBody, destinatarios, archivos_adjuntos=None):
     try:

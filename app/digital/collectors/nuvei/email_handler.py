@@ -1,7 +1,7 @@
 from datetime import datetime
 import pytz
 from app.config import Config
-from app.common.mail import send_mail, sendMailOffice365
+from app.common.mail import sendMailOffice365
 from app.common.s3_utils import *
 
 def send_email_with_results(s3_key, metricas, period):
