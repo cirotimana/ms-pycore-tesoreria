@@ -370,30 +370,7 @@ async def run_calimaco_collector_async(from_date, to_date, method=None, collecto
 
 def get_main_data(from_date, to_date, method=None, collector=None):
     # funcion principal con control de tiempo de ejecucion
-    start_time = time.time()
-    
-    # convertir strings a datetime si es necesario
-    try:
-        if isinstance(from_date, str):
-            from_date = datetime.strptime(from_date, "%Y-%m-%d")
-        if isinstance(to_date, str):
-            to_date = datetime.strptime(to_date, "%Y-%m-%d")
-    except Exception as e:
-        print(f"[error] formato de fecha invalido: {e}")
-        return False
-
-    # validar rango maximo de 10 dias (conteo inclusivo)
-    days_diff = (to_date - from_date).days + 1
-    print(f"[debug] rango solicitado: {from_date.date()} a {to_date.date()} ({days_diff} dias)")
-    
-    if days_diff > 10:
-        print(f"[error] el rango solicitado ({days_diff} dias) excede el maximo permitido de 10 dias")
-        return False
-
-    print(f"\n{'='*50}")
-    print(f"[inicio] proceso calimaco | rango: {from_date.date()} a {to_date.date()}")
-    print(f"{'='*50}\n")
-    
+    start_time = time.time()    
     try:
         result = asyncio.run(run_calimaco_collector_async(from_date, to_date, method, collector))
     except Exception as e:

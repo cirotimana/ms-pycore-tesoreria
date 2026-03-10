@@ -10,11 +10,7 @@ import pytz
 
 
 def get_data_kashio(from_date, to_date):
-    # obtiene datos de kashio validando el rango de fechas
-    valid, from_date, to_date = validate_date_range(from_date, to_date)
-    if not valid:
-        return False
-
+    # obtiene datos de kashio
     s3_client = get_s3_client_with_role()
     try:
         get_data_main(from_date, to_date)
@@ -79,11 +75,7 @@ def get_data_kashio(from_date, to_date):
 
 
 def get_data_calimaco(from_date, to_date):
-    # obtiene datos de calimaco validando el rango de fechas
-    valid, from_date, to_date = validate_date_range(from_date, to_date)
-    if not valid:
-        return False
-
+    # obtiene datos de calimaco
     try:
         method = "KASHIO"
         collector = "kashio"
@@ -122,11 +114,7 @@ def get_data_calimaco(from_date, to_date):
 
 
 def conciliation_data(from_date, to_date):
-    # realiza la conciliacion validando el rango de fechas
-    valid, from_date, to_date = validate_date_range(from_date, to_date)
-    if not valid:
-        return False
-
+    # realiza la conciliacion
     try:
 
         s3_client = get_s3_client_with_role()
@@ -411,7 +399,3 @@ def updated_data_kashio():
         print(f"[error] error en updated_data_kashio: {e}")
         return False
 
-
-if __name__ == "__main__":
-    # ejecucion de prueba
-    get_data_kashio("2026-02-28", "2026-03-09")

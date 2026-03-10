@@ -525,12 +525,8 @@ async def get_data_main_async(from_date, to_date):
 
 
 def get_data_main(from_date, to_date):
-    # wrapper que asegura el formato de fechas y valida el rango de 10 dias
+    # wrapper que asegura el formato de fechas
     start_time = time.time()
-    
-    valid, from_date, to_date = validate_date_range(from_date, to_date)
-    if not valid:
-        return False
 
     print(f"\n{'='*50}")
     print(f"[inicio] proceso kashio | rango: {from_date.date()} a {to_date.date()}")
@@ -555,9 +551,9 @@ def get_data_main(from_date, to_date):
 def validate_date_range(from_date, to_date):
     try:
         if isinstance(from_date, str):
-            from_date = datetime.strptime(from_date, "%Y-%m-%d")
+            from_date = datetime.strptime(from_date, "%d%m%y")
         if isinstance(to_date, str):
-            to_date = datetime.strptime(to_date, "%Y-%m-%d")
+            to_date = datetime.strptime(to_date, "%d%m%y")
     except Exception as e:
         print(f"[error] formato de fecha invalido en kashio: {e}")
         return False, None, None
