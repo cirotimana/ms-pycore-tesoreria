@@ -98,11 +98,12 @@ async def get_data_nuvei(from_date, to_date):
     
 
 async def get_data_calimaco(from_date, to_date):
+    # descarga y procesa el archivo de calimaco para nuvei
     try:
-
         method = 'NUVEI'
         collector = 'nuvei'
-        calimaco_key = await get_main_data_async(from_date, to_date, method, collector)
+        # llamar directamente al async para evitar nested asyncio.run
+        calimaco_key = await run_calimaco_collector_async(from_date, to_date, method, collector)
         calimaco_content = read_file_from_s3(calimaco_key)
 
         df = pd.read_csv(BytesIO(calimaco_content), encoding='utf-8', low_memory=False, dtype={'ID': str, 'Usuario': str, 'ID externo': str})
@@ -332,7 +333,7 @@ def conciliation_data(from_date, to_date):
         
         # Enviar correo
         print("[INFO] Enviando correo con resultados")
-        period_email = f"{from_date.strftime("%Y/%m/%d")} - {to_date.strftime("%Y/%m/%d")}"
+        period_email = f"{from_date.strftime('%Y/%m/%d')} - {to_date.strftime('%Y/%m/%d')}"
         send_email_with_results(output_key, metricas, period_email)
         
         # convierte ambas a date (YYYY-MM-DD)
@@ -431,5 +432,3 @@ def updated_data_nuvei():
         return False
     
 
-if __name__ == "__main__":
-    asyncio.run(updated_data_nuvei())

@@ -5,6 +5,7 @@ import requests
 from datetime import datetime, timedelta
 import json
 import pytz
+import time
 from app.config import Config
 from io import BytesIO
 from app.common.s3_utils import *
@@ -64,13 +65,13 @@ async def get_token_monnet():
             print("[INFO] Lanzando navegador para Monnet")
             browser = await p.chromium.launch(
                 headless=True,
-                args=[
-                        "--no-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                        "--no-zygote",
-                        "--single-process",
-                    ]
+                # args=[
+                #         "--no-sandbox",
+                #         "--disable-dev-shm-usage",
+                #         "--disable-gpu",
+                #         "--no-zygote",
+                #         "--single-process",
+                #     ]
             )
             
             context = await browser.new_context(
@@ -197,97 +198,13 @@ async def close_playwright_resources_monnet(browser, context, page):
 # =============================
 #   FUNCIONES DE DATOS
 # =============================
-# async def get_data_json_monnet_async(token, from_date, to_date):
-#     print(f"[INFO] Descargando transacciones del: {from_date.strftime('%Y-%m-%d')} al {to_date.strftime('%Y-%m-%d')}")
-
-#     headers = {
-#         "Accept": "application/json",
-#         "Content-Type": "application/json",
-#         "Authorization": token
-#     }
-
-#     url = "https://apiin.monnetpayments.com/ms-experience-front/operation-return/api/report/transaction-report?isFilPaymentDate=0"
-
-#     from_d = from_date.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
-#     to_d = to_date.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
-
-#     body = {
-#         "filters": {
-#             "startDate": from_d,
-#             "endDate": to_d,
-#             "merchantIds": [226],
-#             "page": 0,
-#             "size": 1000000,
-#             "chargeBack": None
-#         }
-#     }
-
-#     print(f"[INFO] Descargando transacciones del {from_d} al {to_d}")
-
-#     max_retries = 3
-#     current_token = token
-    
-#     for retry in range(max_retries):
-#         try:
-#             response = requests.post(url, headers=headers, json=body, timeout=180)  # Timeout aumentado
-            
-#             if response.status_code == 200:
-#                 current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
-#                 file_key = f"digital/collectors/monnet/input/response_{current_time}.json"
-                
-#                 # Validar que la respuesta contenga datos
-#                 try:
-#                     response_data = response.json()
-#                     if isinstance(response_data, dict) and response_data.get("data"):
-#                         data_count = len(response_data["data"])
-#                         print(f"[INFO] Datos recibidos: {data_count} registros")
-#                     else:
-#                         print("[WARN] Respuesta no contiene datos esperados")
-#                 except:
-#                     print("[INFO] No se pudo parsear JSON de respuesta, guardando contenido crudo")
-                
-#                 upload_file_to_s3(response.content, file_key)
-#                 print(f"[SUCCESS] Archivo guardado en S3: {file_key}")
-#                 return len(response.content), current_token
-                
-#             elif response.status_code in [401, 403]:
-#                 print(f"[ERROR] Error de autorizacion {response.status_code}")
-#                 if retry < max_retries - 1:
-#                     new_token = await token_cache_monnet.get_token(force_refresh=True)
-#                     if new_token:
-#                         current_token = new_token
-#                         headers["Authorization"] = current_token
-#                         print("[INFO] Token renovado para descarga")
-#                     else:
-#                         print("[ERROR] No se pudo renovar token")
-#                 break
-                
-#             else:
-#                 print(f"[ERROR] Status {response.status_code}: {response.text[:200]}")
-#                 if retry < max_retries - 1:
-#                     print(f"[INFO] Reintentando en 5 segundos...")
-#                     await asyncio.sleep(5)
-#                 else:
-#                     break
-                    
-#         except requests.exceptions.Timeout:
-#             print(f"[ERROR] Timeout en la solicitud, reintento {retry + 1}")
-#             if retry < max_retries - 1:
-#                 await asyncio.sleep(5)
-#             else:
-#                 break
-                
-#         except Exception as e:
-#             print(f"[ERROR] Excepcion durante descarga: {e}")
-#             if retry < max_retries - 1:
-#                 await asyncio.sleep(5)
-#             else:
-#                 break
-    
-#     return None, current_token
 
 async def get_data_json_monnet_async(token, from_date, to_date):
-    print(f"[INFO] Descargando transacciones del: {from_date.strftime('%Y-%m-%d')} al {to_date.strftime('%Y-%m-%d')}")
+    # descarga el rango completo en una sola solicitud con paginacion grande
+    from_d = from_date.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
+    to_d = to_date.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
+
+    print(f"[info] descargando rango completo desde {from_d} hasta {to_d}")
 
     headers = {
         "Accept": "application/json",
@@ -296,9 +213,6 @@ async def get_data_json_monnet_async(token, from_date, to_date):
     }
 
     url = "https://apiin.monnetpayments.com/ms-experience-front/operation-return/api/report/transaction-report?isFilPaymentDate=0"
-
-    from_d = from_date.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
-    to_d = to_date.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
 
     body = {
         "filters": {
@@ -311,7 +225,7 @@ async def get_data_json_monnet_async(token, from_date, to_date):
         }
     }
 
-    print(f"[INFO] Descargando transacciones del {from_d} al {to_d}")
+    print(f"[info] payload: desde {from_d} hasta {to_d}")
 
     max_retries = 3
     current_token = token
@@ -533,6 +447,25 @@ async def get_data_main_async(from_date, to_date):
 
 
 def get_data_main(from_date, to_date):
-    print(f"[WRAPPER] Ejecutando Monnet collector")
-    return asyncio.run(get_data_main_async(from_date, to_date))
+    # wrapper sincrono que ejecuta el proceso principal de monnet y mide el tiempo de ejecucion
+    start_time = time.time()
 
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso monnet | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*50}\n")
+
+    try:
+        result = asyncio.run(get_data_main_async(from_date, to_date))
+    except Exception as e:
+        print(f"[error] fallo ejecucion principal monnet: {e}")
+        result = False
+    finally:
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+
+        print(f"\n{'='*50}")
+        print(f"[fin] proceso monnet completado")
+        print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+        print(f"{'='*50}\n")
+
+    return result

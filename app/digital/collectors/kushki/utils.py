@@ -64,13 +64,13 @@ async def get_token_kushki():
             print("[INFO] Lanzando navegador para Kushki")
             browser = await p.chromium.launch(
                 headless=True,
-                args=[
-                        "--no-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                        "--no-zygote",
-                        "--single-process",
-                    ]
+                # args=[
+                #         "--no-sandbox",
+                #         "--disable-dev-shm-usage",
+                #         "--disable-gpu",
+                #         "--no-zygote",
+                #         "--single-process",
+                #     ]
             )
             
             context = await browser.new_context(
@@ -92,7 +92,11 @@ async def get_token_kushki():
                 if 'authorization' in headers and not token_found:
                     token_found = headers['authorization']
                     print(f"[DEBUG] Token capturado: {token_found[:20]}...")
-                await route.continue_()
+                # ignorar error cuando el contexto ya fue cerrado
+                try:
+                    await route.continue_()
+                except Exception:
+                    pass
 
             await context.route("**", handle_request)
 
@@ -115,9 +119,18 @@ async def get_token_kushki():
 
             if token_found:
                 print("[INFO] Token capturado exitosamente")
+                # limpiar rutas pendientes antes de cerrar el contexto
+                try:
+                    await page.unroute_all(behavior='ignoreErrors')
+                except Exception:
+                    pass
                 return token_found
             else:
                 print("[ERROR] No se encontro token despues de 30 segundos")
+                try:
+                    await page.unroute_all(behavior='ignoreErrors')
+                except Exception:
+                    pass
                 return None
                 
     except Exception as e:
@@ -125,7 +138,7 @@ async def get_token_kushki():
         return None
         
     finally:
-        # CIERRE GARANTIZADO de recursos
+        # cierre garantizado de recursos
         await close_playwright_resources_kushki(browser, context, page)
         
         try:
@@ -210,11 +223,14 @@ def extract_external_id(metadata):
 #   FUNCIONES DE DATOS 
 # =============================
 async def get_data_json_kushki_async(token, from_date, to_date):
-    
-    start_date = from_date.replace(hour=0, minute=0, second=0) 
-    end_date = (to_date + timedelta(days=1)).replace(hour=0, minute=0, second=0)
-    
-    print(f"[INFO] Descargando transacciones del: {start_date.strftime('%Y-%m-%d')} al {end_date.strftime('%Y-%m-%d')}")
+    # descarga registros del rango completo paginando por offset en una sola sesion
+    from_dt = from_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    to_dt = to_date.replace(hour=23, minute=59, second=59, microsecond=0)
+
+    from_date_str = from_dt.strftime("%Y-%m-%dT%H:%M:%S.000")
+    to_date_str = to_dt.strftime("%Y-%m-%dT%H:%M:%S.000")
+
+    print(f"[info] descargando rango completo desde {from_date_str} hasta {to_date_str}")
 
     headers = {
         "Accept": "application/json",
@@ -223,141 +239,107 @@ async def get_data_json_kushki_async(token, from_date, to_date):
     }
 
     url = "https://api.kushkipagos.com/analytics/v1/admin/merchant/search"
-    limit = 250
-
-    total_records = 0
+    limit = 500
     current_token = token
 
-    current = start_date
-    while current < end_date:
-        from_dt = current.replace(hour=0, minute=0, second=0)
-        to_dt = (current + timedelta(days=1)).replace(hour=0, minute=0, second=0)
+    all_data = []
+    offset = 0
+    has_more_data = True
 
-        from_date_str = from_dt.strftime("%Y-%m-%dT%H:%M:%S")
-        to_date_str = to_dt.strftime("%Y-%m-%dT%H:%M:%S")
+    while has_more_data:
+        body = {
+            "filter": {},
+            "from": from_date_str,
+            "limit": limit,
+            "offset": offset,
+            "rangeAmount": {},
+            "sort": {
+                "field": "created",
+                "order": "desc"
+            },
+            "text": "",
+            "timeZone": "-05:00",
+            "to": to_date_str
+        }
 
-        print(f"[INFO] Descargando transacciones del {current.strftime('%Y-%m-%d')}")
+        max_retries = 5
+        success = False
 
-        all_data = []
-        offset = 0
-        has_more_data = True
-        
-        while has_more_data:
-            body = {
-                "filter": {},
-                "from": from_date_str,
-                "limit": limit,
-                "offset": offset,
-                "rangeAmount": {},
-                "sort": {
-                    "field": "created",
-                    "order": "desc"
-                },
-                "text": "",
-                "timeZone": "-05:00",
-                "to": to_date_str
-            }
+        for retry in range(max_retries):
+            try:
+                response = await asyncio.to_thread(
+                    requests.post, url, headers=headers, json=body, timeout=120
+                )
 
-            max_retries = 5
-            success = False
-            registros = []
-            
-            for retry in range(max_retries):
-                try:
-                    response = requests.post(url, headers=headers, json=body, timeout=120)
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if isinstance(data, dict) and 'data' in data:
-                            registros = data['data']
-                        else:
-                            registros = data
-                            
-                        if registros:
-                            all_data.extend(registros)
-                            print(f"[INFO] Descargados {len(registros)} registros (offset {offset})")
-                            
-                            # Verificar si hay mas datos
-                            if len(registros) < limit:
-                                has_more_data = False
-                            else:
-                                offset += limit
-                            
-                            success = True
-                            break
-                        else:
-                            print(f"[INFO] No hay mas registros para {current.strftime('%Y-%m-%d')}")
+                if response.status_code == 200:
+                    data = response.json()
+                    registros = data.get('data', data) if isinstance(data, dict) else data
+
+                    if registros:
+                        all_data.extend(registros)
+                        print(f"[info] descargados {len(registros)} registros (offset {offset})")
+
+                        if len(registros) < limit:
                             has_more_data = False
-                            success = True
-                            break
-                            
-                    elif response.status_code in [401, 403]:
-                        print(f"[ERROR] Error de autorizacion {response.status_code}")
-                        if retry < max_retries - 1:
-                            new_token = await token_cache_kushki.get_token(force_refresh=True)
-                            if new_token:
-                                current_token = new_token
-                                headers["Authorization"] = current_token
-                                print("[INFO] Token renovado para descarga")
-                            else:
-                                print("[ERROR] No se pudo renovar token")
+                        else:
+                            offset += limit
+
+                        success = True
                         break
-                        
-                    elif response.status_code == 504:
-                        print(f"[WARN] Error 504 (timeout) en offset {offset}, reintento {retry + 1}")
-                        if retry < max_retries - 1:
-                            await asyncio.sleep(5)
-                        else:
-                            has_more_data = False
-                            break
-                            
-                    elif response.status_code == 400:
-                        print(f"[WARN] Error 400 en offset {offset}, reintento {retry + 1}")
-                        if retry < max_retries - 1:
-                            await asyncio.sleep(5)
-                        else:
-                            has_more_data = False
-                            break
-                            
                     else:
-                        print(f"[ERROR] Status {response.status_code}: {response.text[:200]}")
+                        print("[info] no hay mas registros")
                         has_more_data = False
+                        success = True
                         break
-                        
-                except Exception as e:
-                    print(f"[ERROR] Excepcion durante descarga: {e}")
+
+                elif response.status_code in [401, 403]:
+                    print(f"[error] error de autorizacion {response.status_code}")
                     if retry < max_retries - 1:
-                        await asyncio.sleep(5)
-                    else:
-                        has_more_data = False
-                        break
-            
-            if not success:
-                print(f"[ERROR] No se pudo descargar datos para offset {offset}")
-                break
-            
-            # Pequena pausa entre requests
-            if has_more_data:
-                await asyncio.sleep(1)
-        
-        print(f"[INFO] Descarga completa para {current.strftime('%Y-%m-%d')}, total registros: {len(all_data)}")
-        total_records += len(all_data)
-        
-        # Guardar datos del dia
-        if all_data:
-            current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
-            file_key = f"digital/collectors/kushki/input/response_{current_time}.json"
-            upload_file_to_s3(json.dumps(all_data, ensure_ascii=False).encode("utf-8"), file_key)
-            print(f"[SUCCESS] Archivo guardado en S3: {file_key}")
-            
-        current += timedelta(days=1)
-        
-        # Pausa entre dias
-        if current < end_date:
-            await asyncio.sleep(2)
-            
-    print(f"[INFO] Total general de registros descargados: {total_records}")
-    return total_records, current_token
+                        new_token = await token_cache_kushki.get_token(force_refresh=True)
+                        if new_token:
+                            current_token = new_token
+                            headers["Authorization"] = current_token
+                            print("[info] token renovado")
+                        else:
+                            print("[error] no se pudo renovar token")
+                    break
+
+                elif response.status_code in [504, 400]:
+                    wait_time = (retry + 1) * 5
+                    print(f"[warn] error {response.status_code}, reintento {retry + 1}, esperando {wait_time}s")
+                    await asyncio.sleep(wait_time)
+
+                else:
+                    print(f"[error] status {response.status_code}: {response.text[:200]}")
+                    has_more_data = False
+                    break
+
+            except Exception as e:
+                print(f"[error] excepcion durante descarga: {e}")
+                if retry < max_retries - 1:
+                    await asyncio.sleep(5)
+                else:
+                    has_more_data = False
+                    break
+
+        if not success:
+            print(f"[error] no se pudo descargar datos para offset {offset}")
+            break
+
+        # pausa minima entre paginas
+        if has_more_data:
+            await asyncio.sleep(0.5)
+
+    print(f"[info] total registros descargados: {len(all_data)}")
+
+    if all_data:
+        current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
+        file_key = f"digital/collectors/kushki/input/response_{current_time}.json"
+        upload_file_to_s3(json.dumps(all_data, ensure_ascii=False).encode("utf-8"), file_key)
+        print(f"[success] archivo guardado en s3: {file_key}")
+
+    return len(all_data), current_token
+
 
 
 def json_excel_kushki():
@@ -502,7 +484,25 @@ async def get_data_main_async(from_date, to_date):
 
 
 def get_data_main(from_date, to_date):
-    print(f"[WRAPPER] Ejecutando Kushki collector")
-    return asyncio.run(get_data_main_async(from_date, to_date))
+    # wrapper sincrono que ejecuta el proceso principal de kushki y mide el tiempo de ejecucion
+    start_time = time.time()
 
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso kushki | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*50}\n")
 
+    try:
+        result = asyncio.run(get_data_main_async(from_date, to_date))
+    except Exception as e:
+        print(f"[error] fallo ejecucion principal kushki: {e}")
+        result = False
+    finally:
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+
+        print(f"\n{'='*50}")
+        print(f"[fin] proceso kushki completado")
+        print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+        print(f"{'='*50}\n")
+
+    return result

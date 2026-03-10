@@ -2,6 +2,7 @@ from app.digital.collectors.kashio.analysis import *
 from datetime import datetime, timedelta
 import pytz
 import time
+from app.common.utils import validate_date_range
 
 def get_main_kashio(from_date = None, to_date = None):
     lima_tz = pytz.timezone("America/Lima")

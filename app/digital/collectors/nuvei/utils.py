@@ -1,4 +1,5 @@
 import asyncio
+import time
 from playwright.async_api import async_playwright
 import requests
 from datetime import datetime, timedelta
@@ -7,8 +8,6 @@ from app.common.s3_utils import *
 from app.digital.collectors.nuvei.get_qr_2mf.use_secret import main as get_validator_main
 import re
 import os
-
-
 
 # =============================
 #   CACHE DE SESION NUVEI
@@ -62,13 +61,13 @@ async def get_nuvei_session():
             print("[INFO] Lanzando navegador para Nuvei")
             browser = await p.chromium.launch(
                 headless=True,
-                args=[
-                        "--no-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                        "--no-zygote",
-                        "--single-process",
-                    ]
+                # args=[
+                #         "--no-sandbox",
+                #         "--disable-dev-shm-usage",
+                #         "--disable-gpu",
+                #         "--no-zygote",
+                #         "--single-process",
+                #     ]
             )
             
             context = await browser.new_context()
@@ -404,47 +403,57 @@ async def process_day_download(from_date, to_date, max_retries=5):
 
 
 async def get_main_download(from_date, to_date):
-    start_date = from_date.replace(hour=0, minute=0, second=0) 
+    # descarga los archivos de nuvei iterando dia por dia dentro del rango
+    start_date = from_date.replace(hour=0, minute=0, second=0)
     end_date = (to_date + timedelta(days=1)).replace(hour=0, minute=0, second=0)
-    
+
+    start_time = time.time()
+
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso nuvei | rango: {start_date.strftime('%Y-%m-%d')} a {(end_date - timedelta(days=1)).strftime('%Y-%m-%d')}")
+    print(f"{'='*50}\n")
+
     current = start_date
     downloaded_files = []
-    
-    print(f"[INICIO] Procesando descargas Nuvei desde {start_date.strftime('%d/%m/%Y')} hasta {end_date.strftime('%d/%m/%Y')}")
-    
+
     while current < end_date:
         from_d = current
         to_d = current
-        
-        print(f"[INFO] Procesando dia: {from_d.strftime('%d/%m/%Y')}")
-        
-        try:        
+
+        print(f"[info] procesando dia: {from_d.strftime('%d/%m/%Y')}")
+
+        try:
             filename = await process_day_download(from_d, to_d)
-            
+
             if filename:
-                print(f"[SUCCESS] Descarga completada: {filename}")
+                print(f"[info] descarga completada: {filename}")
                 downloaded_files.append(filename)
             else:
-                print(f"[ERROR] No se pudo completar la descarga para {from_d.strftime('%d/%m/%Y')}")
-                # Continuar con el siguiente dia en lugar de retornar None
-                print("[INFO] Continuando con el siguiente dia...")
+                print(f"[error] no se pudo completar la descarga para {from_d.strftime('%d/%m/%Y')}")
+                print("[info] continuando con el siguiente dia...")
 
         except Exception as e:
-            print(f"[ERROR] Error procesando dia {from_d.strftime('%d/%m/%Y')}: {e}")
-            print("[INFO] Continuando con el siguiente dia...")
-        
+            print(f"[error] error procesando dia {from_d.strftime('%d/%m/%Y')}: {e}")
+            print("[info] continuando con el siguiente dia...")
+
         current += timedelta(days=1)
-        
-        # Pequeña pausa entre dias
+
+        # pausa entre dias para evitar saturar el servidor
         if current < end_date:
-            print("[INFO] Esperando 2 segundos antes del siguiente dia...")
+            print("[info] esperando 2 segundos antes del siguiente dia...")
             await asyncio.sleep(2)
-        
+
+    elapsed_time = time.time() - start_time
+
+    print(f"\n{'='*50}")
+    print(f"[fin] proceso nuvei completado")
+    print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+    print(f"{'='*50}\n")
+
     if downloaded_files:
-        print(f"[SUCCESS] Procesamiento completado. Total de archivos descargados: {len(downloaded_files)}")
+        print(f"[info] procesamiento completado. total de archivos descargados: {len(downloaded_files)}")
         return downloaded_files
     else:
-        print("[ERROR] No se pudo descargar ningun archivo")
+        print("[error] no se pudo descargar ningun archivo")
         return None
-
 

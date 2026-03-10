@@ -8,71 +8,6 @@ from app.common.database import get_dts_session
 from app.common.s3_utils import *
 from app.digital.collectors.calimaco.main import *
 
-
-def get_data_niubiz(from_date, to_date):
-    s3_client = get_s3_client_with_role()
-    try:
-        get_data_main_2(from_date, to_date)
-    except Exception as e:
-        print(f"[ALERTA] Error ejecutando la descarga de Niubiz: {e}")
-        return False
-
-    try:
-        s3_prefix = "digital/collectors/niubiz/input/"
-        s3_files = list_files_in_s3(s3_prefix)
-
-        dataframes = []
-
-        for s3_key in s3_files:
-            if (s3_key.endswith('.csv')) and '/input/processed/' not in s3_key:
-                try:
-                    content = read_file_from_s3(s3_key)
-                  
-                    with BytesIO(content) as csv_data:
-                        df = pd.read_csv(csv_data, header=3, dtype={'N°Voucher/Id pedido': str, 'ID operación': str})
-                    
-                    dataframes.append(df)
-                    
-                    # Mover a processed
-                    if '/input/' in s3_key and '/input/processed/' not in s3_key:
-                        new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
-
-                except Exception as e:
-                    print(f"Error al procesar {s3_key}: {e}")
-
-        if dataframes:
-            consolidated_df = pd.concat(dataframes, ignore_index=True)
-
-            
-            
-            # Guardar en S3
-            current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
-            output_key = f"digital/collectors/niubiz/output/Niubiz_Ventas_{current_time}.csv"
-
-            with BytesIO() as buffer:
-                consolidated_df.to_csv(buffer, index=False)
-                buffer.seek(0)
-                upload_file_to_s3(buffer.getvalue(), output_key)
-
-            # download_file_from_s3_to_local(output_key)  # Comentado para optimizar
-            print(f"[SUCCESS] Niubiz procesado exitosamente: {output_key}")
-            return True
-        
-        else:
-            print("[✖] No se encontraron archivos CSV para consolidar.")
-            return False
-
-    except Exception as e:
-        print(f"[✖] Error procesando datos niubiz: {e}")
-        return False
-
-
 def get_data_calimaco(from_date, to_date):
     try:
         method = 'NIUBIZ'
@@ -337,7 +272,7 @@ def conciliation_data(from_date, to_date):
         
         # Enviar correo
         print("[INFO] Enviando correo con resultados")
-        period_email = f"{from_date.strftime("%Y/%m/%d")} - {to_date.strftime("%Y/%m/%d")}"
+        period_email = f"{from_date.strftime('%Y/%m/%d')} - {to_date.strftime('%Y/%m/%d')}"
         send_email_with_results(output_key, metricas, period_email)
         
         # convierte ambas a date (YYYY-MM-DD)
@@ -512,5 +447,3 @@ def get_data_niubiz_1(from_date, to_date):
         return False
 
 
-if __name__ == "__main__":
-    conciliation_data()

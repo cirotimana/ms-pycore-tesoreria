@@ -8,7 +8,7 @@ import pytz
 import asyncio
 from playwright.async_api import async_playwright
 import urllib.parse
-import time
+import time as _time
 from app.config import Config
 import threading
 
@@ -346,44 +346,49 @@ def process_extracted_files(collector_name=None, specific_file_key=None):
 #   flujo principal
 # =============================
 async def run_calimaco_collector_async(from_date, to_date, method=None, collector_name=None):
-    # orquestador asincrono del proceso de extraccion
+    # orquestador asincrono del proceso de extraccion con control de tiempo
+    start_time = _time.time()
+
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso calimaco | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*50}\n")
+
     try:
         session_token = await session_cache.get_session(force_refresh=True)
-        
+
         if not session_token:
             print("[error] no se pudo establecer sesion con calimaco")
             return False
 
         file_key = await download_wallet_report(session_token, from_date, to_date, method, collector_name)
-        
+
         if file_key:
             print(f"[info] archivo descargado, iniciando procesamiento directo")
-            return process_extracted_files(collector_name, specific_file_key=file_key)
+            result = process_extracted_files(collector_name, specific_file_key=file_key)
         else:
             print("[warn] no se pudo descargar el archivo del rango solicitado")
-            return False
+            result = False
 
     except Exception as e:
         print(f"[error] error general en flujo asincrono: {e}")
-        return False
+        result = False
+
+    finally:
+        elapsed_time = _time.time() - start_time
+        print(f"\n{'='*50}")
+        print(f"[fin] proceso calimaco completado")
+        print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+        print(f"{'='*50}\n")
+
+    return result
 
 
 def get_main_data(from_date, to_date, method=None, collector=None):
-    # funcion principal con control de tiempo de ejecucion
-    start_time = time.time()    
+    # wrapper sincrono que ejecuta el proceso principal de calimaco
     try:
         result = asyncio.run(run_calimaco_collector_async(from_date, to_date, method, collector))
     except Exception as e:
         print(f"[error] fallo ejecucion principal: {e}")
         result = False
-    finally:
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        
-        print(f"\n{'='*50}")
-        print(f"[fin] proceso calimaco completado")
-        print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
-        print(f"{'='*50}\n")
-    
     return result
 

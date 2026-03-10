@@ -10,6 +10,7 @@ from io import BytesIO
 from app.common.s3_utils import *
 import time
 from contextlib import contextmanager
+import random
 
 
 # =============================
@@ -257,6 +258,9 @@ async def close_playwright_resources_kashio(browser, context, page):
 async def download_day_data(current_day, headers, url, limit, semaphore):
     # funcion auxiliar para descargar la data de un solo dia con paginacion y limite de concurrencia
     async with semaphore:
+        # jitter aleatorio para evitar que multiples peticiones golpeen el gateway al mismo tiempo
+        jitter = random.uniform(0, 5)
+        await asyncio.sleep(jitter)
         print(f"[info] iniciando descarga para {current_day.date()} (concurrencia controlada)")
         
         from_dt = current_day.replace(hour=5, minute=0, second=0)
@@ -311,8 +315,10 @@ async def download_day_data(current_day, headers, url, limit, semaphore):
                         return None
                         
                     elif response.status_code in [502, 504]:
-                        wait_time = (retry + 1) * 10 # exponencial basico
-                        print(f"[warn] {current_day.date()} | error {response.status_code}, reintento {retry + 1}, esperando {wait_time}s")
+                        # backoff con jitter: empieza corto y crece, maximo 30 segundos
+                        base_wait = min(2 * (2 ** retry), 30)
+                        wait_time = base_wait + random.uniform(0, 5)
+                        print(f"[warn] {current_day.date()} | error {response.status_code}, reintento {retry + 1}, esperando {wait_time:.1f}s")
                         await asyncio.sleep(wait_time)
                     else:
                         print(f"[error] {current_day.date()} | status {response.status_code}: {response.text[:100]}")
@@ -548,24 +554,3 @@ def get_data_main(from_date, to_date):
     
     return result
 
-def validate_date_range(from_date, to_date):
-    try:
-        if isinstance(from_date, str):
-            from_date = datetime.strptime(from_date, "%d%m%y")
-        if isinstance(to_date, str):
-            to_date = datetime.strptime(to_date, "%d%m%y")
-    except Exception as e:
-        print(f"[error] formato de fecha invalido en kashio: {e}")
-        return False, None, None
-
-    # validar rango maximo de 10 dias (conteo inclusivo)
-    try:
-        days_diff = (to_date.replace(tzinfo=None) - from_date.replace(tzinfo=None)).days + 1
-        if days_diff > 10:
-            print(f"[error] kashio: el rango solicitado ({days_diff} dias) excede el maximo de 10 dias")
-            return False, None, None
-    except Exception as e:
-        print(f"[error] calculando el rango en kashio: {e}")
-        return False, None, None
-    
-    return True, from_date, to_date
