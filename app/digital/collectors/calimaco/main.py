@@ -29,15 +29,15 @@ class SessionCacheCalimaco:
 
             if (not force_refresh and self.session and 
                 self.expires_at and now < self.expires_at):
-                print("[info] usando sesion calimaco del cache")
+                print("[info calimaco] usando sesion calimaco del cache")
                 return self.session
 
-            print("[info] obteniendo nueva sesion calimaco...")
+            print("[info calimaco] obteniendo nueva sesion calimaco...")
             self.session = await get_session_cookies()
 
             if self.session:
                 self.expires_at = now + timedelta(minutes=30)
-                print(f"[info] sesion cacheada hasta {self.expires_at}")
+                print(f"[info calimaco] sesion cacheada hasta {self.expires_at}")
 
             return self.session
 
@@ -55,7 +55,7 @@ session_cache = SessionCacheCalimaco()
 # =============================
 async def get_session_cookies(max_attempts=10):
     # inicia navegador para capturar la sesion
-    print("[info] iniciando navegador para obtener sesion calimaco")
+    print("[info calimaco] iniciando navegador para obtener sesion calimaco")
 
     browser = None
     context = None
@@ -64,7 +64,7 @@ async def get_session_cookies(max_attempts=10):
 
     try:
         async with async_playwright() as p:
-            print("[info] lanzando navegador")
+            print("[info calimaco] lanzando navegador")
             browser = await p.chromium.launch(
                 headless=True,
                 # args=[
@@ -97,12 +97,12 @@ async def get_session_cookies(max_attempts=10):
                         params = urllib.parse.parse_qs(post_data)
                         captured_session = params.get("session", [None])[0]
                         if captured_session:
-                            print(f"[debug] sesion capturada: {captured_session[:15]}...")
+                            print(f"[debug calimaco] sesion capturada: {captured_session[:15]}...")
 
             page.on("request", handle_request)
 
             for attempt in range(max_attempts):
-                print(f"[info] intento de login #{attempt + 1}")
+                print(f"[info calimaco] intento de login #{attempt + 1}")
                 
                 try:
                     await page.goto("https://bo.apuestatotal.com/login", 
@@ -115,24 +115,24 @@ async def get_session_cookies(max_attempts=10):
 
                     for _ in range(15):
                         if captured_session:
-                            print(f"[ok] sesion capturada en intento {attempt + 1}")
+                            print(f"[ok calimaco] sesion capturada en intento {attempt + 1}")
                             return captured_session
                         await asyncio.sleep(1)
 
-                    print(f"[warn] sesion no capturada, reintentando...")
+                    print(f"[warn calimaco] sesion no capturada, reintentando...")
                     
                 except Exception as e:
-                    print(f"[error] error en intento {attempt + 1}: {e}")
+                    print(f"[error calimaco] error en intento {attempt + 1}: {e}")
 
-            print("[error] no se pudo capturar la sesion")
+            print("[error calimaco] no se pudo capturar la sesion")
             return None
 
     except Exception as e:
-        print(f"[error] error inesperado: {e}")
+        print(f"[error calimaco] error inesperado: {e}")
         return None
 
     finally:
-        print("[info] cerrando recursos de navegador")
+        print("[info calimaco] cerrando recursos de navegador")
         cleanup_tasks = []
         
         if page:
@@ -144,7 +144,7 @@ async def get_session_cookies(max_attempts=10):
             
         if cleanup_tasks:
             await asyncio.gather(*cleanup_tasks, return_exceptions=True)
-            print("[debug] recursos cerrados")
+            print("[debug calimaco] recursos cerrados")
 
 
 # =============================
@@ -153,7 +153,7 @@ async def get_session_cookies(max_attempts=10):
 async def download_wallet_report(session_token, from_date, to_date, method=None, collector_name=None):
     # descarga reporte de transacciones en un solo rango
     if not session_token or not method or not collector_name:
-        print("[error] parametros invalidos para descarga")
+        print("[error calimaco] parametros invalidos para descarga")
         return False
 
     api_url = "https://wallet.apuestatotal.com/api/admin_reports/getReport"
@@ -166,7 +166,7 @@ async def download_wallet_report(session_token, from_date, to_date, method=None,
     from_str = from_date.replace(hour=5, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
     to_str = (to_date + timedelta(days=1)).replace(hour=5, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
     
-    print(f"[info] descargando rango completo desde {from_str} hasta {to_str}")
+    print(f"[info calimaco] descargando rango completo desde {from_str} hasta {to_str}")
 
     payload = {
         "session": session_token,
@@ -184,16 +184,16 @@ async def download_wallet_report(session_token, from_date, to_date, method=None,
     
     for retry in range(5):
         try:
-            print(f"[info] enviando solicitud a calimaco (intento {retry + 1}/5), esperando respuesta (timeout 300s)...")
+            print(f"[info calimaco] enviando solicitud a calimaco (intento {retry + 1}/5), esperando respuesta (timeout 300s)...")
             response = requests.post(url=api_url, headers=request_headers, data=payload, timeout=300)
             
             if response.status_code == 200:
                 file_content = response.content
                 
                 if not file_content or len(file_content) < 100:
-                    print(f"[warn] contenido insuficiente del reporte (intento {retry + 1})")
+                    print(f"[warn calimaco] contenido insuficiente del reporte (intento {retry + 1})")
                     if retry < 4:
-                        print("[info] reintentando en 10 segundos...")
+                        print("[info calimaco] reintentando en 10 segundos...")
                         await asyncio.sleep(10)
                         continue
                 
@@ -201,25 +201,25 @@ async def download_wallet_report(session_token, from_date, to_date, method=None,
                 s3_output_key = f"digital/collectors/{collector_name}/calimaco/input/calimaco_{timestamp_str}.csv"
                 
                 upload_file_to_s3(file_content, s3_output_key)
-                print(f"[ok] reporte consolidado guardado en s3: {s3_output_key}")
+                print(f"[ok calimaco] reporte consolidado guardado en s3: {s3_output_key}")
                 return s3_output_key
                 
             elif response.status_code == 401:
-                print(f"[error] sesion expirada (401)")
+                print(f"[error calimaco] sesion expirada (401)")
                 session_cache.invalidate()
                 return False
                 
             else:
-                print(f"[error] error {response.status_code}: {response.text}")
+                print(f"[error calimaco] error {response.status_code}: {response.text}")
                 if retry < 4:
                     await asyncio.sleep(10)
                 
         except Exception as e:
-            print(f"[warn] error en intento {retry + 1}: {e}")
+            print(f"[warn calimaco] error en intento {retry + 1}: {e}")
             if retry < 4:
                 await asyncio.sleep(10)
 
-    print(f"[error] no se pudo descargar el reporte de rango completo")
+    print(f"[error calimaco] no se pudo descargar el reporte de rango completo")
     return False
 
 
@@ -229,7 +229,7 @@ async def download_wallet_report(session_token, from_date, to_date, method=None,
 def process_extracted_files(collector_name=None, specific_file_key=None):
     # procesa y consolida archivos csv. si se provee una key especifica, se procesa solo esa.
     if not collector_name:
-        print("[error] nombre de recaudador no proporcionado")
+        print("[error calimaco] nombre de recaudador no proporcionado")
         return False
     
     s3_client = get_s3_client_with_role()
@@ -240,19 +240,19 @@ def process_extracted_files(collector_name=None, specific_file_key=None):
         # si tenemos una key especifica, no listamos todo el s3
         if specific_file_key:
             files_to_process = [specific_file_key]
-            print(f"[info] procesando directamente el archivo: {specific_file_key}")
+            print(f"[info calimaco] procesando directamente el archivo: {specific_file_key}")
         else:
             input_prefix = f"digital/collectors/{collector_name}/calimaco/input/"
             files_to_process = [f for f in list_files_in_s3(input_prefix) if f.endswith('.csv') and '/input/processed/' not in f]
-            print(f"[info] buscando archivos para procesar en {input_prefix}")
+            print(f"[info calimaco] buscando archivos para procesar en {input_prefix}")
         
         for file_key in files_to_process:
             try:
-                print(f"[debug] leyendo archivo: {file_key}")
+                print(f"[debug calimaco] leyendo archivo: {file_key}")
                 raw_content = read_file_from_s3(file_key)
                 
                 if not raw_content or len(raw_content) < 100:
-                    print(f"[warn] archivo vacio o corrupto: {file_key}")
+                    print(f"[warn calimaco] archivo vacio o corrupto: {file_key}")
                     continue
                 
                 with BytesIO(raw_content) as csv_buffer:
@@ -264,17 +264,17 @@ def process_extracted_files(collector_name=None, specific_file_key=None):
                                         low_memory=False)
                 
                 if temp_df.empty:
-                    print(f"[warn] dataframe vacio para {file_key}")
+                    print(f"[warn calimaco] dataframe vacio para {file_key}")
                     continue
                 
                 required_columns = ['Identifier', 'Status', 'Amount']
                 missing_columns = [col for col in required_columns if col not in temp_df.columns]
                 if missing_columns:
-                    print(f"[warn] faltan columnas en {file_key}: {missing_columns}")
+                    print(f"[warn calimaco] faltan columnas en {file_key}: {missing_columns}")
                     continue
                 
                 extracted_dfs.append(temp_df)
-                print(f"[info] procesado correctamente {file_key}")
+                print(f"[info calimaco] procesado correctamente {file_key}")
 
                 # mover archivo a carpeta de procesados
                 processed_key = file_key.replace('/input/', '/input/processed/', 1)
@@ -286,15 +286,15 @@ def process_extracted_files(collector_name=None, specific_file_key=None):
                 delete_file_from_s3(file_key)
 
             except Exception as e:
-                print(f"[error] error procesando {file_key}: {e}")
+                print(f"[error calimaco] error procesando {file_key}: {e}")
                 continue
 
         if extracted_dfs:
-            print(f"[info] consolidando {len(extracted_dfs)} archivos...")
+            print(f"[info calimaco] consolidando {len(extracted_dfs)} archivos...")
             consolidated_df = pd.concat(extracted_dfs, ignore_index=True, copy=False)
             
             if consolidated_df.empty:
-                print("[error] consolidacion resulto en dataframe vacio")
+                print("[error calimaco] consolidacion resulto en dataframe vacio")
                 return False
             
             # mapeo de columnas a nombres legibles
@@ -333,14 +333,14 @@ def process_extracted_files(collector_name=None, specific_file_key=None):
                 output_buffer.seek(0)
                 upload_file_to_s3(output_buffer.getvalue(), final_csv_key)
 
-            print(f"[info] archivo final guardado: {final_csv_key}")
+            print(f"[info calimaco] archivo final guardado: {final_csv_key}")
         else:
-            print("[warn] no se encontraron datos para procesar")
+            print("[warn calimaco] no se encontraron datos para procesar")
             
         return final_csv_key
 
     except Exception as e:
-        print(f"[error] falla en procesamiento de archivos: {e}")
+        print(f"[error calimaco] falla en procesamiento de archivos: {e}")
         return False
 
 
@@ -352,34 +352,34 @@ async def run_calimaco_collector_async(from_date, to_date, method=None, collecto
     start_time = _time.time()
 
     print(f"\n{'='*50}")
-    print(f"[inicio] proceso calimaco | rango: {from_date.date()} a {to_date.date()}")
+    print(f"[inicio calimaco] proceso calimaco | rango: {from_date.date()} a {to_date.date()}")
     print(f"{'='*50}\n")
 
     try:
         session_token = await session_cache.get_session(force_refresh=True)
 
         if not session_token:
-            print("[error] no se pudo establecer sesion con calimaco")
+            print("[error calimaco] no se pudo establecer sesion con calimaco")
             return False
 
         file_key = await download_wallet_report(session_token, from_date, to_date, method, collector_name)
 
         if file_key:
-            print(f"[info] archivo descargado, iniciando procesamiento directo")
+            print(f"[info calimaco] archivo descargado, iniciando procesamiento directo")
             result = process_extracted_files(collector_name, specific_file_key=file_key)
         else:
-            print("[warn] no se pudo descargar el archivo del rango solicitado")
+            print("[warn calimaco] no se pudo descargar el archivo del rango solicitado")
             result = False
 
     except Exception as e:
-        print(f"[error] error general en flujo asincrono: {e}")
+        print(f"[error calimaco] error general en flujo asincrono: {e}")
         result = False
 
     finally:
         elapsed_time = _time.time() - start_time
         print(f"\n{'='*50}")
-        print(f"[fin] proceso calimaco completado")
-        print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+        print(f"[fin calimaco] proceso calimaco completado")
+        print(f"[tiempo calimaco] duracion total: {elapsed_time:.2f} segundos")
         print(f"{'='*50}\n")
 
     return result
@@ -390,7 +390,7 @@ def get_main_data(from_date, to_date, method=None, collector=None):
     try:
         result = asyncio.run(run_calimaco_collector_async(from_date, to_date, method, collector))
     except Exception as e:
-        print(f"[error] fallo ejecucion principal: {e}")
+        print(f"[error calimaco] fallo ejecucion principal: {e}")
         result = False
     return result
 

@@ -71,13 +71,13 @@ async def get_token_yape_2(max_login_attempts=5):
             print("[INFO] Lanzando navegador para Yape")
             browser = await p.chromium.launch(
                 headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-gpu",
-                    "--no-zygote",
-                    "--single-process",
-                ]
+                # args=[
+                #     "--no-sandbox",
+                #     "--disable-dev-shm-usage",
+                #     "--disable-gpu",
+                #     "--no-zygote",
+                #     "--single-process",
+                # ]
             )
             
             context = await browser.new_context(
@@ -652,9 +652,23 @@ async def get_data_main_async_2(from_date, to_date):
     
 
 def get_data_main_2(from_date, to_date):
-    print(f"[INICIO] Ejecutando Yape para {from_date} a {to_date}")
-    result = asyncio.run(get_data_main_async_2(from_date, to_date))
-    print(f"[FIN] Proceso Yape completado {result}")
+    start_time = time.time()
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso extraccion async yape | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*50}\n")
+    print(f"[wrapper] ejecutando yape collector")
+    
+    result = None
+    try:
+        result = asyncio.run(get_data_main_async_2(from_date, to_date))
+    except Exception as e:
+        print(f"[error] error en get_data_main_2: {e}")
+        
+    elapsed_time = time.time() - start_time
+    print(f"\n{'='*50}")
+    print(f"[fin] proceso yape completado")
+    print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+    print(f"{'='*50}\n")
     return result
 
 
@@ -685,13 +699,13 @@ async def get_token_yape_1(max_login_attempts=3):
             print("[INFO] Lanzando navegador Chrome en modo headless")
             browser = await p.chromium.launch(
                 headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-gpu",
-                    "--no-zygote",
-                    "--single-process",
-                ]
+                # args=[
+                #     "--no-sandbox",
+                #     "--disable-dev-shm-usage",
+                #     "--disable-gpu",
+                #     "--no-zygote",
+                #     "--single-process",
+                # ]
             )
             
             context = await browser.new_context(
@@ -959,7 +973,24 @@ async def get_data_main_json_async(from_date, to_date):
 
 
 def get_data_main_json(from_date, to_date):
-    return asyncio.run(get_data_main_json_async(from_date, to_date))
+    start_time = time.time()
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso extraccion json yape | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*50}\n")
+    print(f"[wrapper] ejecutando yape json collector")
+    
+    result = None
+    try:
+        result = asyncio.run(get_data_main_json_async(from_date, to_date))
+    except Exception as e:
+        print(f"[error] error en get_data_main_json: {e}")
+        
+    elapsed_time = time.time() - start_time
+    print(f"\n{'='*50}")
+    print(f"[fin] proceso yape json completado")
+    print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+    print(f"{'='*50}\n")
+    return result
 
 
 
