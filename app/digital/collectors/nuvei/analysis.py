@@ -15,18 +15,16 @@ import pytz
 async def get_data_nuvei(from_date, to_date):
     s3_client = get_s3_client_with_role()
     try:
-        filename = await get_main_download(from_date, to_date)
-        if filename:
-            print(f"[INFO] Archivo descargado: {filename}")
+        s3_files = await get_main_download(from_date, to_date)
+        if s3_files:
+            print(f"[info] archivos descargados: {len(s3_files)}")
         else:
-            return
+            return False
     except Exception as e:
-        print(f"[ERROR] Error ejecutando la descarga de nuvei: {e}")
+        print(f"[error] error ejecutando la descarga de nuvei: {e}")
         return False
     
     try:
-        s3_prefix = "digital/collectors/nuvei/input/"
-        s3_files = list_files_in_s3(s3_prefix)
         
         dataframes = []
         
@@ -37,7 +35,7 @@ async def get_data_nuvei(from_date, to_date):
                     with BytesIO(content) as excel_data:
                         df = pd.read_excel(excel_data, header=12, dtype={'Client Unique ID': str})
                         df = df.drop(df.index[-1])
-                        print(f"[DEBUG] Archivo {s3_key}: {len(df)} registros")
+                        print(f"[debug] archivo {s3_key}: {len(df)} registros")
                         
                         if 'Client Unique ID' in df.columns:
                             df['Client Unique ID'] = (
@@ -47,13 +45,12 @@ async def get_data_nuvei(from_date, to_date):
                                 .astype(str)
                             )
                         
-                        # Validar fechas del archivo
                         if 'Date' in df.columns:
                             df['Date_parsed'] = pd.to_datetime(df['Date'], errors='coerce')
                             date_range = f"{df['Date_parsed'].min()} a {df['Date_parsed'].max()}"
-                            print(f"[DEBUG] Rango de fechas en {s3_key}: {date_range}")
+                            print(f"[debug] rango de fechas en {s3_key}: {date_range}")
                         
-                    # Agregar al listado de DataFrames
+                    # agregar al listado de dataframes
                     dataframes.append(df)
                     
                     # Mover a processed
@@ -67,16 +64,16 @@ async def get_data_nuvei(from_date, to_date):
                         delete_file_from_s3(s3_key)
                     
                 except Exception as e:
-                    print(f"[ERROR] Error al procesar {s3_key}: {e}")
+                    print(f"[error] error al procesar {s3_key}: {e}")
 
         if dataframes:
             consolidated_df = pd.concat(dataframes, ignore_index=True)
-            print(f"[DEBUG] Total registros consolidados Nuvei: {len(consolidated_df)}")
-            print(f"[DEBUG] Estados únicos consolidados: {consolidated_df['Transaction Result'].value_counts().to_dict()}")
+            print(f"[debug] total registros consolidados nuvei: {len(consolidated_df)}")
+            print(f"[debug] estados unicos consolidados: {consolidated_df['Transaction Result'].value_counts().to_dict()}")
             
             
             
-            # Guardar en S3
+            # guardar en s3
             current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
             output_key = f"digital/collectors/nuvei/output/Nuvei_Ventas_{current_time}.xlsx"
 
@@ -86,14 +83,14 @@ async def get_data_nuvei(from_date, to_date):
                 upload_file_to_s3(buffer.getvalue(), output_key)
             
             ##download_file_from_s3_to_local(output_key)##para pruebitas lo guardo en local
-            print(f"[SUCCESS] Nuvei procesado exitosamente: {output_key}")
+            print(f"[ok] nuvei procesado exitosamente: {output_key}")
             return True
         else:
-            print("[ERROR] No se encontraron archivos Excel para consolidar.")
+            print("[error] no se encontraron archivos excel para consolidar.")
             return False
 
     except Exception as e:
-        print(f"[ERROR] Error procesando datos Nuvei: {e}")
+        print(f"[error] error procesando datos nuvei: {e}")
         return False
     
 

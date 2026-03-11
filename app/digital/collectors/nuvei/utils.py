@@ -341,21 +341,20 @@ async def download_with_retry(session_cookies, file_path=None, max_attempts=30):
 #   FUNCIONES PRINCIPALES 
 # =============================
 async def process_day_download(from_date, to_date, max_retries=5):
-    print(f"[INFO] Procesando fecha: {from_date.strftime('%d/%m/%Y')}")
+    print(f"[info] procesando fecha: {from_date.strftime('%d/%m/%Y')}")
     
     session_data = None
     
     for retry in range(max_retries):
-        # Obtener sesion del cache (forzar refresh despues del primer intento fallido)
         force_refresh = (retry > 0)
-        print(f"[INFO] Obteniendo sesion (intento {retry + 1}/{max_retries}, refresh: {force_refresh})")
+        print(f"[info] obteniendo sesion (intento {retry + 1}/{max_retries}, refresh: {force_refresh})")
         
         session_data = await session_cache_nuvei.get_session(force_refresh=force_refresh)
         
         if not session_data:
-            print("[ERROR] No se pudo obtener sesion")
+            print("[error] no se pudo obtener sesion")
             if retry < max_retries - 1:
-                print("[INFO] Esperando 5 segundos antes de reintentar...")
+                print("[info] esperando 5 segundos antes de reintentar...")
                 await asyncio.sleep(5)
                 continue
             return None
@@ -364,39 +363,37 @@ async def process_day_download(from_date, to_date, max_retries=5):
         session_cookies = session_data.get('cookies')
         
         if not csrf_token or not session_cookies:
-            print("[ERROR] Sesion incompleta - faltan CSRF token o cookies")
+            print("[error] sesion incompleta - faltan csrf token o cookies")
             session_cache_nuvei.invalidate()
             if retry < max_retries - 1:
                 await asyncio.sleep(5)
                 continue
             return None
         
-        # Enviar solicitud de exportacion
         success, result = await send_export_request(csrf_token, session_cookies, from_date, to_date)
         
         if isinstance(result, int) and result in [419, 401]:
-            print(f"[WARN] Sesion expirada ({result}), obteniendo nueva sesion")
+            print(f"[warn] sesion expirada ({result}), obteniendo nueva sesion")
             session_cache_nuvei.invalidate()
             if retry < max_retries - 1:
                 continue
             return None
         
         if not success:
-            print("[ERROR] No se pudo enviar la solicitud de exportacion")
+            print("[error] no se pudo enviar la solicitud de exportacion")
             if retry < max_retries - 1:
                 await asyncio.sleep(5)
                 continue
             return None
         
-        # Intentar descargar el archivo (result puede ser el file_path)
         file_path = result if isinstance(result, str) else None
         filename = await download_with_retry(session_cookies, file_path)
         
         if filename:
-            return filename
+            # devolver path relativo en S3
+            return f"digital/collectors/nuvei/input/{filename}"
         
-        # Si fallo la descarga, reintentar con nueva sesion
-        print(f"[WARN] Descarga fallida, reintentando con nueva sesion ({retry + 2}/{max_retries})")
+        print(f"[warn] descarga fallida, reintentando con nueva sesion ({retry + 2}/{max_retries})")
         session_cache_nuvei.invalidate()
     
     return None
@@ -414,7 +411,7 @@ async def get_main_download(from_date, to_date):
     print(f"{'='*50}\n")
 
     current = start_date
-    downloaded_files = []
+    downloaded_s3_keys = []
 
     while current < end_date:
         from_d = current
@@ -423,11 +420,11 @@ async def get_main_download(from_date, to_date):
         print(f"[info] procesando dia: {from_d.strftime('%d/%m/%Y')}")
 
         try:
-            filename = await process_day_download(from_d, to_d)
+            s3_key = await process_day_download(from_d, to_d)
 
-            if filename:
-                print(f"[info] descarga completada: {filename}")
-                downloaded_files.append(filename)
+            if s3_key:
+                print(f"[info] descarga completada: {s3_key}")
+                downloaded_s3_keys.append(s3_key)
             else:
                 print(f"[error] no se pudo completar la descarga para {from_d.strftime('%d/%m/%Y')}")
                 print("[info] continuando con el siguiente dia...")
@@ -450,9 +447,9 @@ async def get_main_download(from_date, to_date):
     print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
     print(f"{'='*50}\n")
 
-    if downloaded_files:
-        print(f"[info] procesamiento completado. total de archivos descargados: {len(downloaded_files)}")
-        return downloaded_files
+    if downloaded_s3_keys:
+        print(f"[info] finalizado. total de archivos descargados: {len(downloaded_s3_keys)}")
+        return downloaded_s3_keys
     else:
         print("[error] no se pudo descargar ningun archivo")
         return None

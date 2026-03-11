@@ -5,7 +5,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from app.common.utils import validate_date_range
 
-
 def get_main_monnet(from_date=None, to_date=None):
     # funcion principal que coordina la descarga y conciliacion de monnet
     lima_tz = pytz.timezone("America/Lima")

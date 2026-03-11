@@ -184,7 +184,8 @@ async def download_wallet_report(session_token, from_date, to_date, method=None,
     
     for retry in range(5):
         try:
-            response = requests.post(url=api_url, headers=request_headers, data=payload, timeout=120)
+            print(f"[info] enviando solicitud a calimaco (intento {retry + 1}/5), esperando respuesta (timeout 300s)...")
+            response = requests.post(url=api_url, headers=request_headers, data=payload, timeout=300)
             
             if response.status_code == 200:
                 file_content = response.content
@@ -192,6 +193,7 @@ async def download_wallet_report(session_token, from_date, to_date, method=None,
                 if not file_content or len(file_content) < 100:
                     print(f"[warn] contenido insuficiente del reporte (intento {retry + 1})")
                     if retry < 4:
+                        print("[info] reintentando en 10 segundos...")
                         await asyncio.sleep(10)
                         continue
                 

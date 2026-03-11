@@ -1,31 +1,64 @@
 import boto3
 from botocore.exceptions import ClientError
+from botocore.config import Config as BotoConfig
 import os
-from typing import List
+import time as _time
+from datetime import datetime
+from typing import List, Optional
 from app.config import Config
 
+# === CACHE DE CLIENTE S3 === #
+_S3_CLIENT_CACHE = None
+_S3_CREDS_EXPIRATION = 0
+
 def get_s3_client_with_role():
+    global _S3_CLIENT_CACHE, _S3_CREDS_EXPIRATION
+    
+    current_time = _time.time()
+    
+    # Reutilizar cliente si faltan mas de 5 minutos para que expire
+    if _S3_CLIENT_CACHE and current_time < (_S3_CREDS_EXPIRATION - 300):
+        return _S3_CLIENT_CACHE
+
     try:
+        print("[info] asumiendo rol de aws para s3...")
         sts = boto3.client(
             "sts",
             aws_access_key_id=Config.BASE_ACCESS_KEY,
             aws_secret_access_key=Config.BASE_SECRET_KEY
         )
+        
+        # Solicitar duracion (por defecto 1 hora si no se especifica mas en el rol)
         assumed = sts.assume_role(
             RoleArn=Config.ROLE_ARN,
-            RoleSessionName="user-session",
-            DurationSeconds=43200 ##---> solicitar cambio a 43200 (12 horas) o 86400 (24 horas)
+            RoleSessionName="reconciliation-session",
+            DurationSeconds=3600
         )
+        
         creds = assumed['Credentials']
-        return boto3.client(
-            "s3",
+        _S3_CREDS_EXPIRATION = creds['Expiration'].timestamp()
+        
+        # Configurar timeouts y reintentos
+        s3_config = BotoConfig(
             region_name=Config.S3_REGION,
+            connect_timeout=60,
+            read_timeout=120,
+            retries={'max_attempts': 5, 'mode': 'standard'}
+        )
+        
+        _S3_CLIENT_CACHE = boto3.client(
+            "s3",
+            config=s3_config,
             aws_access_key_id=creds['AccessKeyId'],
             aws_secret_access_key=creds['SecretAccessKey'],
             aws_session_token=creds['SessionToken']
         )
+        
+        print(f"[ok] cliente s3 cacheado hasta {creds['Expiration']}")
+        return _S3_CLIENT_CACHE
+        
     except ClientError as e:
-        print("[ALERTA] error al asumir el rol:", e)
+        print(f"[error] error al asumir el rol de s3: {e}")
         return None
     
 
