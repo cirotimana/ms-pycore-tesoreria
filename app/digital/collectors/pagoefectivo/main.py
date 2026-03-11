@@ -114,7 +114,7 @@ def get_updated_pagoefectivo():
             print(f"[ok] todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos")
             return {
                 "success": True,
-                "message": "todas las operaciones completadas exitosamente",
+                "message": f"todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos",
                 "failed_operations": []
             }
         else:
@@ -130,7 +130,7 @@ def get_updated_pagoefectivo():
             print(f"[warn] operaciones fallidas despues de {elapsed_time:.2f} segundos: {failed_operations}")
             return {
                 "success": False,
-                "message": "algunas operaciones fallaron",
+                "message": f"algunas operaciones fallaron en {elapsed_time:.2f} segundos",
                 "failed_operations": failed_operations,
                 "successful_operations": [op for op, success in results.items() if success]
             }

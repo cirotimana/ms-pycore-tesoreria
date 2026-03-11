@@ -766,7 +766,7 @@ def json_excel_pagoefectivo():
 def get_data_main_json(from_date, to_date):
     start_time = time.time()
     print(f"\n{'='*50}")
-    print(f"[inicio] proceso extraccion json pagoefectivo | rango: {from_date} a {to_date}")
+    print(f"[inicio] proceso extraccion json pagoefectivo | rango: {from_date.date()} a {to_date.date()}")
     print(f"{'='*50}\n")
     
     success = False

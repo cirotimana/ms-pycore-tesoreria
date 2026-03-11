@@ -127,4 +127,4 @@ def get_updated_yape(from_date = None, to_date = None):
         }
     
 if __name__ == "__main__":
-    get_main_yape() 
+    get_main_yape('01102026', '02102026')

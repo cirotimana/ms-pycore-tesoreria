@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from app.digital.collectors.tupay.utils import *
 from app.digital.collectors.tupay.email_handler import *
 from app.common.database import *
-from app.common.database import get_dts_session
 from app.common.s3_utils import *
 from app.digital.collectors.calimaco.main import *
 

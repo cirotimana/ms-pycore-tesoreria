@@ -8,6 +8,7 @@ import pytz
 from app.config import Config
 from io import BytesIO
 from app.common.s3_utils import *
+import time
 
 
 # =============================
@@ -25,23 +26,23 @@ class TokenCacheSafetyPay:
             
             if (not force_refresh and self.cookie_header and 
                 self.expires_at and now < self.expires_at):
-                print("[INFO] Usando token SafetyPay del cache")
+                print("[info] Usando token SafetyPay del cache")
                 return self.cookie_header
 
-            print("[INFO] Obteniendo nuevo token SafetyPay...")
+            print("[info] Obteniendo nuevo token SafetyPay...")
             self.cookie_header = await get_token_safetypay()
             
             if self.cookie_header:
                 # Token valido por 30 minutos
                 self.expires_at = now + timedelta(minutes=30)
-                print(f"[INFO] Token SafetyPay cacheado hasta {self.expires_at}")
+                print(f"[info] Token SafetyPay cacheado hasta {self.expires_at}")
             else:
-                print("[ERROR] No se pudo obtener nuevo token SafetyPay")
+                print("[error] No se pudo obtener nuevo token SafetyPay")
             
             return self.cookie_header
 
     def invalidate(self):
-        print("[INFO] Invalidando cookies SafetyPay cacheadas")
+        print("[info] Invalidando cookies SafetyPay cacheadas")
         self.cookie_header = None
         self.expires_at = None
 
@@ -60,16 +61,16 @@ async def get_token_safetypay():
     
     try:
         async with async_playwright() as p:
-            print("[INFO] Lanzando navegador para SafetyPay")
+            print("[info] Lanzando navegador para SafetyPay")
             browser = await p.chromium.launch(
                 headless=True,
-                args=[
-                        "--no-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                        "--no-zygote",
-                        "--single-process",
-                    ]
+                # args=[
+                #         "--no-sandbox",
+                #         "--disable-dev-shm-usage",
+                #         "--disable-gpu",
+                #         "--no-zygote",
+                #         "--single-process",
+                #     ]
             )
             
             context = await browser.new_context(
@@ -86,47 +87,47 @@ async def get_token_safetypay():
             page = await context.new_page()
 
             try:
-                print("[INFO] Navegando a SafetyPay")
+                print("[info] Navegando a SafetyPay")
                 await page.goto("https://secure.safetypay.com/merchantportal/es/dashboard", wait_until="networkidle", timeout=60000)
 
                 # Login
-                print("[INFO] Realizando login")
+                print("[info] Realizando login")
                 await page.click('.mp-btn.mp-btn_primary.mp-public-header__button')
                 await page.fill('input[name="Username"], input[type="email"], input[type="text"]', Config.USER_NAME_SAFETYPAY)
                 await page.fill('input[name="Password"], input[type="password"]', Config.PASSWORD_SAFETYPAY)
                 await page.click('button[name="button"][value="login"]')
                 
                 # Esperar a que se complete el login
-                print("[INFO] Esperando completar login")
+                print("[info] Esperando completar login")
                 await page.wait_for_url("**/dashboard**", timeout=30000)
                 
                 # Navegar a la pagina de reportes para activar llamadas API
-                print("[INFO] Navegando a pagina de reportes")
+                print("[info] Navegando a pagina de reportes")
                 try:
                     await page.goto("https://secure.safetypay.com/merchantportal/es/dashboard/reports/transactions", wait_until="networkidle", timeout=60000)
                     await asyncio.sleep(3)  
                 except:
-                    print("[INFO] No se pudo navegar a reportes, continuando")
+                    print("[info] No se pudo navegar a reportes, continuando")
                 
                 # Capturar cookies
                 cookies = await context.cookies()
                 cookie_header = "; ".join([f"{c['name']}={c['value']}" for c in cookies])
 
-                print(f"[INFO] Cookies capturadas: {cookie_header[:100]}...")
+                print(f"[info] Cookies capturadas: {cookie_header[:100]}...")
 
                 if cookie_header:
-                    print("[INFO] Cookies capturadas exitosamente")
+                    print("[info] Cookies capturadas exitosamente")
                     return cookie_header 
                 else:
-                    print("[ERROR] No se pudieron capturar cookies")
+                    print("[error] No se pudieron capturar cookies")
                     return None
                     
             except Exception as e:
-                print(f"[ERROR] Error durante la captura: {e}")
+                print(f"[error] Error durante la captura: {e}")
                 return None
                 
     except Exception as e:
-        print(f"[ERROR] Error general en get_token_safetypay: {e}")
+        print(f"[error] Error general en get_token_safetypay: {e}")
         return None
         
     finally:
@@ -135,14 +136,14 @@ async def get_token_safetypay():
         
         try:
             await p.__aexit__(None, None, None)  
-            print("[DEBUG] Playwright cerrado completamente.")
+            print("[debug] Playwright cerrado completamente.")
         except Exception:
             pass
 
 
 
 async def close_playwright_resources_safetypay(browser, context, page):
-    print("[INFO] Cerrando recursos de SafetyPay...")
+    print("[info] Cerrando recursos de SafetyPay...")
     cleanup_tasks = []
     
     if page:
@@ -155,9 +156,9 @@ async def close_playwright_resources_safetypay(browser, context, page):
     if cleanup_tasks:
         try:
             await asyncio.gather(*cleanup_tasks, return_exceptions=True)
-            print("[DEBUG] Recursos de SafetyPay cerrados correctamente")
+            print("[debug] Recursos de SafetyPay cerrados correctamente")
         except Exception as e:
-            print(f"[WARN] Error cerrando recursos de SafetyPay: {e}")
+            print(f"[warn] Error cerrando recursos de SafetyPay: {e}")
 
 
 # =============================
@@ -168,7 +169,7 @@ async def get_data_json_safetypay_async(cookie_header, from_date, to_date):
     start_date = from_date
     end_date = (to_date + timedelta(days=2))
         
-    print(f"[INFO] Descargando transacciones del: {start_date.strftime('%Y-%m-%d')} al {end_date.strftime('%Y-%m-%d')}")
+    print(f"[info] Descargando transacciones del: {start_date.strftime('%Y-%m-%d')} al {end_date.strftime('%Y-%m-%d')}")
     
     # Extraer X-XSRF-Token de las cookies
     xsrf_token = None
@@ -181,7 +182,7 @@ async def get_data_json_safetypay_async(cookie_header, from_date, to_date):
         
         # El token XSRF viene en la cookie .MP.Antiforgery
         xsrf_token = cookies_dict.get('.MP.Antiforgery', '')
-        print(f"[INFO] X-XSRF-Token extraído: {xsrf_token[:50]}...")
+        print(f"[info] X-XSRF-Token extraído: {xsrf_token[:50]}...")
     
     # Headers
     headers = {
@@ -214,7 +215,7 @@ async def get_data_json_safetypay_async(cookie_header, from_date, to_date):
     while current < end_date:
         current_date_str = current.strftime("%m.%d.%Y")
 
-        print(f"[INFO] Descargando transacciones del {current_date_str}")
+        print(f"[info] Descargando transacciones del {current_date_str}")
     
         params = {
             "pageNumber": 1,
@@ -243,35 +244,35 @@ async def get_data_json_safetypay_async(cookie_header, from_date, to_date):
             
             for attempt in range(1, max_retries + 1):
                 try:
-                    print(f"[INFO] Solicitando pagina {params['pageNumber']} (Intento {attempt}/{max_retries})")
+                    print(f"[info] Solicitando pagina {params['pageNumber']} (Intento {attempt}/{max_retries})")
                     await asyncio.sleep(1) 
                     
                     response = session.get(url, params=params, timeout=30)
                     
-                    print(f"[DEBUG] Status Code: {response.status_code}")
+                    print(f"[debug] Status Code: {response.status_code}")
                     
                     if response.status_code == 200:
                         data = response.json()
                         if isinstance(data, dict) and "result" in data and "data" in data["result"]:
                             registros = data["result"]["data"]
                         else:
-                            print("[INFO] No se encontro la clave 'result' o 'data' en la respuesta")
+                            print("[info] No se encontro la clave 'result' o 'data' en la respuesta")
                             has_more_pages = False
                             success = True
                             break
                         
                         if not registros:
-                            print("[INFO] No se encontraron mas registros")
+                            print("[info] No se encontraron mas registros")
                             has_more_pages = False
                             success = True
                             break
                         
                         day_data.extend(registros)
-                        print(f"[INFO] Pagina {params['pageNumber']} - {len(registros)} registros obtenidos")
+                        print(f"[info] Pagina {params['pageNumber']} - {len(registros)} registros obtenidos")
 
                         # Verificar si hay mas paginas
                         if page_size > len(registros):
-                            print("[INFO] Ultima pagina alcanzada")
+                            print("[info] Ultima pagina alcanzada")
                             has_more_pages = False
                         else:
                             params["pageNumber"] += 1
@@ -280,13 +281,13 @@ async def get_data_json_safetypay_async(cookie_header, from_date, to_date):
                         break
                     
                     elif response.status_code == 403:
-                        print("[ERROR] Error 403: Acceso denegado")
-                        print(f"[DEBUG] Response Content: {response.text[:500]}")
+                        print("[error] Error 403: Acceso denegado")
+                        print(f"[debug] Response Content: {response.text[:500]}")
                         has_more_pages = False
                         break
                     
                     elif response.status_code in [401, 403]:
-                        print(f"[ERROR] Error de autorizacion {response.status_code}")
+                        print(f"[error] Error de autorizacion {response.status_code}")
                         if attempt < max_retries - 1:
                             # Renovar cookies y extraer nuevo XSRF token
                             new_cookie_header = await token_cache_safetypay.get_session_data(force_refresh=True)
@@ -304,13 +305,13 @@ async def get_data_json_safetypay_async(cookie_header, from_date, to_date):
                                 headers["Cookie"] = new_cookie_header
                                 headers["x-xsrf-token"] = current_xsrf_token
                                 session.headers.update(headers)
-                                print("[INFO] Cookies y XSRF token SafetyPay renovados correctamente")
+                                print("[info] Cookies y XSRF token SafetyPay renovados correctamente")
                             else:
-                                print("[ERROR] No se pudieron renovar cookies SafetyPay")
+                                print("[error] No se pudieron renovar cookies SafetyPay")
                         break
                     
                     else:
-                        print(f"[ERROR] Status {response.status_code}: {response.text[:200]}")
+                        print(f"[error] Status {response.status_code}: {response.text[:200]}")
                         if attempt < max_retries - 1:
                             await asyncio.sleep(2)  
                         else:
@@ -318,19 +319,19 @@ async def get_data_json_safetypay_async(cookie_header, from_date, to_date):
                         continue
                     
                 except requests.exceptions.RequestException as e:
-                    print(f"[ERROR] Error de conexion: {e} (intento {attempt}/{max_retries})")
+                    print(f"[error] Error de conexion: {e} (intento {attempt}/{max_retries})")
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2)  
                     continue
                     
                 except json.JSONDecodeError as e:
-                    print(f"[ERROR] Error al decodificar JSON: {e}")
-                    print(f"[DEBUG] Response content: {response.text[:500]}")
+                    print(f"[error] Error al decodificar JSON: {e}")
+                    print(f"[debug] Response content: {response.text[:500]}")
                     has_more_pages = False
                     break
                     
                 except Exception as e:
-                    print(f"[ERROR] Error inesperado: {e} (intento {attempt}/{max_retries})")
+                    print(f"[error] Error inesperado: {e} (intento {attempt}/{max_retries})")
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2) 
                     else:
@@ -338,11 +339,11 @@ async def get_data_json_safetypay_async(cookie_header, from_date, to_date):
                     continue
                 
             if not success:
-                print(f"[ERROR] No se pudo obtener datos para pagina {params['pageNumber']}")
+                print(f"[error] No se pudo obtener datos para pagina {params['pageNumber']}")
                 has_more_pages = False
                 break
 
-        print(f"[INFO] Total registros para {current_date_str}: {len(day_data)}")
+        print(f"[info] Total registros para {current_date_str}: {len(day_data)}")
         all_data.extend(day_data)
         
         current += timedelta(days=1)
@@ -352,13 +353,13 @@ async def get_data_json_safetypay_async(cookie_header, from_date, to_date):
             await asyncio.sleep(2)
             
     session.close()
-    print(f"[INFO] Total de registros obtenidos: {len(all_data)}")
+    print(f"[info] Total de registros obtenidos: {len(all_data)}")
     
     if all_data:
         current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
         file_key = f"digital/collectors/safetypay/input/response_{current_time}.json"
         upload_file_to_s3(json.dumps(all_data, ensure_ascii=False).encode("utf-8"), file_key)
-        print(f"[SUCCESS] Archivo guardado en S3: {file_key}")
+        print(f"[ok] Archivo guardado en S3: {file_key}")
 
     return len(all_data), current_cookie_header
 
@@ -371,7 +372,7 @@ def json_excel_safetypay(from_date, to_date):
     from_date_str = start_date.strftime("%Y-%m-%d %H:%M:%S") 
     to_date_str = end_date.strftime("%Y-%m-%d %H:%M:%S")
 
-    print(f"[INFO] Transformando transacciones del: {from_date_str} al {to_date_str}")
+    print(f"[info] Transformando transacciones del: {from_date_str} al {to_date_str}")
     
     prefix = "digital/collectors/safetypay/input/"
     files = list_files_in_s3(prefix)
@@ -382,7 +383,7 @@ def json_excel_safetypay(from_date, to_date):
         if not file_key.endswith(".json") or "/input/processed/" in file_key:
             continue
 
-        print(f"[INFO] Procesando {file_key}")
+        print(f"[info] Procesando {file_key}")
         try:
             content = read_file_from_s3(file_key)
             data = json.loads(content.decode("utf-8"))
@@ -393,7 +394,7 @@ def json_excel_safetypay(from_date, to_date):
                 data = []
 
             if not data or not isinstance(data, list):
-                print("[INFO] No hay datos validos para procesar")
+                print("[info] No hay datos validos para procesar")
                 continue
 
             rows = []
@@ -455,7 +456,7 @@ def json_excel_safetypay(from_date, to_date):
             ]
             df = df[column_order]
             
-            print(f"[INFO] Se procesaron {len(df)} registros")
+            print(f"[info] Se procesaron {len(df)} registros")
             # Filtrar por fecha
             # df_filtrado = df[(df['Fecha'] >= from_date_str) & (df['Fecha'] <= to_date_str)]
 
@@ -472,13 +473,13 @@ def json_excel_safetypay(from_date, to_date):
             delete_file_from_s3(file_key)
 
             processed_count += 1
-            print(f"[SUCCESS] Procesado: {file_key} -> {output_key}")
+            print(f"[ok] Procesado: {file_key} -> {output_key}")
 
         except Exception as e:
-            print(f"[ERROR] Error procesando {file_key}: {e}")
+            print(f"[error] Error procesando {file_key}: {e}")
             continue
 
-    print(f"[INFO] Proceso JSON -> Excel completado. Archivos procesados: {processed_count}")
+    print(f"[info] Proceso JSON -> Excel completado. Archivos procesados: {processed_count}")
 
 
 # =============================
@@ -486,35 +487,48 @@ def json_excel_safetypay(from_date, to_date):
 # =============================
 async def get_data_main_async(from_date, to_date):
     try:
-        print(f"[INICIO] Procesando SafetyPay desde {from_date} hasta {to_date}")
+        print(f"[INICIO] Procesando SafetyPay desde {from_date.date()} hasta {to_date.date()}")
         
         # Obtener cookies del cache
         cookie_header = await token_cache_safetypay.get_session_data()
         if not cookie_header:
-            print("[ERROR] No se pudieron obtener cookies de SafetyPay")
+            print("[error] No se pudieron obtener cookies de SafetyPay")
             return False
 
         # Descargar datos
         data_count, final_cookie_header = await get_data_json_safetypay_async(cookie_header, from_date, to_date)
         
         if data_count and data_count > 0:
-            print(f"[INFO] {data_count} registros descargados, generando archivo Excel")
+            print(f"[info] {data_count} registros descargados, generando archivo Excel")
             json_excel_safetypay(from_date, to_date)
-            print("[SUCCESS] Proceso SafetyPay completado exitosamente")
+            print("[ok] Proceso SafetyPay completado exitosamente")
             return True
         else:
-            print("[INFO] No hay datos para procesar")
+            print("[info] No hay datos para procesar")
             return False
         
     except Exception as e:
-        print(f"[ERROR] Error en get_data_main_async: {e}")
+        print(f"[error] Error en get_data_main_async: {e}")
         return False
 
 
 def get_data_main(from_date, to_date):
-    print(f"[WRAPPER] Ejecutando SafetyPay collector")
-    return asyncio.run(get_data_main_async(from_date, to_date))
+    start_time = time.time()
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso extraccion async safetypay | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*50}\n")
+    print(f"[wrapper] ejecutando safetypay collector")
+    
+    success = False
+    try:
+        success = asyncio.run(get_data_main_async(from_date, to_date))
+    except Exception as e:
+        print(f"[error] error en get_data_main: {e}")
+        
+    elapsed_time = time.time() - start_time
+    print(f"\n{'='*50}")
+    print(f"[fin] proceso safetypay completado")
+    print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+    print(f"{'='*50}\n")
+    return success
 
-
-if __name__ == "__main__":
-    asyncio.run(get_token_safetypay())
