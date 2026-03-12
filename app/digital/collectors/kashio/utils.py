@@ -28,23 +28,23 @@ class TokenCacheKashio:
             
             if (not force_refresh and self.token and 
                 self.expires_at and now < self.expires_at):
-                print("[INFO] Usando token Kashio del cache")
+                print("[info] usando token kashio del cache")
                 return self.token
 
-            print("[INFO] Obteniendo nuevo token Kashio...")
+            print("[info] obteniendo nuevo token kashio...")
             self.token = await get_token_kashio()
             
             if self.token:
-                # Token valido por 30 minutos
+                # token valido por 30 minutos
                 self.expires_at = now + timedelta(minutes=30)
-                print(f"[INFO] Token Kashio cacheado hasta {self.expires_at}")
+                print(f"[info] token kashio cacheado hasta {self.expires_at}")
             else:
-                print("[ERROR] No se pudo obtener nuevo token Kashio")
+                print("[error] no se pudo obtener nuevo token kashio")
             
             return self.token
 
     def invalidate(self):
-        print("[INFO] Invalidando token Kashio cacheado")
+        print("[info] invalidando token kashio cacheado")
         self.token = None
         self.expires_at = None
 
@@ -63,16 +63,16 @@ async def get_token_kashio():
     
     try:
         async with async_playwright() as p:
-            print("[INFO] Lanzando navegador para Kashio")
+            print("[info] lanzando navegador para kashio")
             browser = await p.chromium.launch(
                 headless=True,  
-                # args=[
-                #     "--no-sandbox",
-                #     "--disable-dev-shm-usage", 
-                #     "--disable-gpu",
-                #     "--no-zygote",
-                #     "--single-process",
-                # ]
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage", 
+                    "--disable-gpu",
+                    "--no-zygote",
+                    "--single-process",
+                ]
             )
             
             context = await browser.new_context(
@@ -93,81 +93,81 @@ async def get_token_kashio():
                 headers = route.request.headers
                 if 'authorization' in headers and not token_found:
                     token_found = headers['authorization']
-                    print(f"[DEBUG] Token capturado: {token_found[:20]}...")
+                    print(f"[debug] token capturado: {token_found[:20]}...")
                 await route.continue_()
 
             await context.route("**/design.configuration*", handle_request)
             
-            print("[INFO] Navegando a Kashio")
+            print("[info] navegando a kashio")
             await page.goto("https://kpms.kashio.net/", wait_until='networkidle', timeout=60000)
 
-            # Verificar errores de carga
+            # verificar errores de carga
             page_content = await page.content()
             if "Oops" in page_content:
-                print("[ERROR] Error detectado al cargar la pagina KashIO")
+                print("[error] error detectado al cargar la pagina kashio")
                 return None
 
-            # NUEVA FUNCION PARA HACER LOGIN DE FORMA ROBUSTA
+            # nueva funcion para hacer login de forma robusta
             async def intentar_login():
                 try:
-                    # Esperar un poco para que la pagina cargue completamente
+                    # esperar un poco para que la pagina cargue completamente
                     await asyncio.sleep(3)
                     
-                    # ESTRATEGIA 1: Esperar explicitamente por los campos
-                    print("[DEBUG] Esperando campos de login...")
+                    # estrategia 1: esperar explicitamente por los campos
+                    print("[debug] esperando campos de login...")
                     try:
                         await page.wait_for_selector('input[name="email"]', state='visible', timeout=10000)
                         await page.wait_for_selector('input[name="password"]', state='visible', timeout=10000)
                         await page.wait_for_selector('#login-submit-button', state='visible', timeout=10000)
-                        print("[DEBUG] Campos de login encontrados (selectores estandar)")
+                        print("[debug] campos de login encontrados (selectores estandar)")
                     except:
-                        print("[WARN] No se encontraron con selectores estandar, intentando alternativas...")
+                        print("[warn] no se encontraron con selectores estandar, intentando alternativas...")
                         
-                        # ESTRATEGIA 2: Buscar por tipo de input
+                        # estrategia 2: buscar por tipo de input
                         email_input = await page.query_selector('input[type="email"]')
                         password_input = await page.query_selector('input[type="password"]')
                         submit_button = await page.query_selector('button[type="submit"]')
                         
                         if not (email_input and password_input and submit_button):
-                            print("[ERROR] No se pudieron encontrar los campos de login")
+                            print("[error] no se pudieron encontrar los campos de login")
                             return False
                     
-                    # Verificar visibilidad
+                    # verificar visibilidad
                     email_visible = await page.is_visible('input[name="email"]') or await page.is_visible('input[type="email"]')
                     password_visible = await page.is_visible('input[name="password"]') or await page.is_visible('input[type="password"]')
                     button_visible = await page.is_visible('#login-submit-button') or await page.is_visible('button[type="submit"]')
                     
-                    print(f"[DEBUG] Email visible: {email_visible}")
-                    print(f"[DEBUG] Password visible: {password_visible}")
-                    print(f"[DEBUG] Boton visible: {button_visible}")
+                    print(f"[debug] email visible: {email_visible}")
+                    print(f"[debug] password visible: {password_visible}")
+                    print(f"[debug] boton visible: {button_visible}")
                     
                     if not (email_visible and password_visible and button_visible):
-                        print("[WARN] Algunos campos no visibles, esperando mas tiempo...")
+                        print("[warn] algunos campos no visibles, esperando mas tiempo...")
                         await asyncio.sleep(3)
                     
-                    # ESTRATEGIA 3: Llenar con multiples intentos
-                    print("[INFO] Llenando campo email...")
+                    # estrategia 3: llenar con multiples intentos
+                    print("[info] llenando campo email...")
                     
-                    # Intentar por name primero
+                    # intentar por name primero
                     try:
                         await page.fill('input[name="email"]', Config.USER_NAME_KASHIO, timeout=5000)
                     except:
-                        # Fallback a tipo
+                        # fallback a tipo
                         await page.fill('input[type="email"]', Config.USER_NAME_KASHIO, timeout=5000)
                     
-                    # Pequeña pausa
+                    # pequeña pausa
                     await asyncio.sleep(0.5)
                     
-                    print("[INFO] Llenando campo password...")
+                    print("[info] llenando campo password...")
                     try:
                         await page.fill('input[name="password"]', Config.PASSWORD_KASHIO, timeout=5000)
                     except:
                         await page.fill('input[type="password"]', Config.PASSWORD_KASHIO, timeout=5000)
                     
-                    # Pequeña pausa antes de hacer click
+                    # pequeña pausa antes de hacer click
                     await asyncio.sleep(0.5)
                     
-                    print("[INFO] Haciendo click en login...")
+                    print("[info] haciendo click en login...")
                     try:
                         await page.click('#login-submit-button', timeout=5000)
                     except:
@@ -176,64 +176,64 @@ async def get_token_kashio():
                     return True
                     
                 except Exception as e:
-                    print(f"[ERROR] Error en intentar_login: {e}")
+                    print(f"[error] error en intentar_login: {e}")
                     return False
             
-            # Hacer el primer intento de login
+            # hacer el primer intento de login
             login_success = await intentar_login()
             if not login_success:
-                print("[ERROR] Fallo el primer intento de login")
+                print("[error] fallo el primer intento de login")
                 return None
             
-            # Esperar redireccion
+            # esperar redireccion
             try:
                 await page.wait_for_url("**/home**", timeout=15000)
-                print("[INFO] Login exitoso - Redirigido a home")
+                print("[info] login exitoso - redirigido a home")
             except:
-                print("[INFO] No hubo redireccion inmediata despues del login")
+                print("[info] no hubo redireccion inmediata despues del login")
 
-            # Esperar token
+            # esperar token
             max_wait_cycles = 10       
             wait_per_cycle = 60
 
-            print(f"[INFO] Esperando captura del token (hasta {max_wait_cycles * wait_per_cycle}s totales)")
+            print(f"[info] esperando captura del token (hasta {max_wait_cycles * wait_per_cycle}s totales)")
             for attempt in range(max_wait_cycles):
                 for i in range(wait_per_cycle):
                     if token_found:
-                        print(f"[SUCCESS] Token capturado en segundo {attempt * wait_per_cycle + i + 1}")
+                        print(f"[ok] token capturado en segundo {attempt * wait_per_cycle + i + 1}")
                         break
                     await asyncio.sleep(1)
 
                 if token_found:
                     break
                 else:
-                    print(f"[WARN] Intento {attempt + 1}/{max_wait_cycles} sin token. Refrescando pagina y reintentando login...")
+                    print(f"[warn] intento {attempt + 1}/{max_wait_cycles} sin token. refrescando pagina y reintentando login...")
                     try:
                         await page.reload(wait_until='networkidle', timeout=30000)
                         
-                        # Reintentar login despues del reload
+                        # reintentar login despues del reload
                         await intentar_login()
                         
                     except Exception as e:
-                        print(f"[ERROR] Fallo al refrescar intento {attempt + 1}: {e}")
+                        print(f"[error] fallo al refrescar intento {attempt + 1}: {e}")
                     await asyncio.sleep(5)
 
             if token_found:
-                print("[INFO] Token capturado exitosamente")
+                print("[info] token capturado exitosamente")
                 return token_found
             else:
-                print("[ERROR] No se encontro token despues de reintentos")
+                print("[error] no se encontro token despues de reintentos")
                 return None
                 
     except Exception as e:
-        print(f"[ERROR] Error general en get_token_kashio: {e}")
+        print(f"[error] error general en get_token_kashio: {e}")
         return None
         
     finally:
         await close_playwright_resources_kashio(browser, context, page)
 
 async def close_playwright_resources_kashio(browser, context, page):
-    print("[INFO] Cerrando recursos de Kashio...")
+    print("[info] cerrando recursos de kashio...")
 
     cleanup_tasks = [] 
     if page:
@@ -248,9 +248,9 @@ async def close_playwright_resources_kashio(browser, context, page):
     if cleanup_tasks: 
         try: 
             await asyncio.gather(*cleanup_tasks, return_exceptions=True) 
-            print("[DEBUG] Recursos de Kashio cerrados correctamente")
+            print("[debug] recursos de kashio cerrados correctamente")
         except Exception as e: 
-            print(f"[WARN] Error cerrando recursos de Kashio: {e}")
+            print(f"[warn] error cerrando recursos de kashio: {e}")
 
 # =============================
 #   FUNCIONES DE DATOS 
@@ -505,7 +505,7 @@ def json_excel_kashio():
 # =============================
 async def get_data_main_async(from_date, to_date):
     try:
-        print(f"[INICIO] Procesando Kashio desde {from_date} hasta {to_date}")
+        print(f"[inicio] procesando kashio desde {from_date} hasta {to_date}")
         
         # obtener token del cache
         token = await token_cache_kashio.get_token()
@@ -519,7 +519,7 @@ async def get_data_main_async(from_date, to_date):
         if data_count and data_count > 0:
             print(f"[info] {data_count} registros descargados, generando archivo excel")
             await json_excel_kashio_async()
-            print("[success] proceso kashio completado exitosamente")
+            print("[ok] proceso kashio completado exitosamente")
             return True
         else:
             print("[info] no hay datos para procesar")
@@ -549,7 +549,7 @@ def get_data_main(from_date, to_date):
         
         print(f"\n{'='*50}")
         print(f"[fin] proceso kashio completado")
-        print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+        print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
         print(f"{'='*50}\n")
     
     return result

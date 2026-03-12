@@ -53,15 +53,10 @@ async def get_data_nuvei(from_date, to_date):
                     # agregar al listado de dataframes
                     dataframes.append(df)
                     
-                    # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
                     
                 except Exception as e:
                     print(f"[error] error al procesar {s3_key}: {e}")
@@ -121,16 +116,15 @@ async def get_data_calimaco(from_date, to_date):
             
         delete_file_from_s3(calimaco_key)
         
-        print(f"[SUCCESS] Calimaco procesado exitosamente: {output_key}")
+        print(f"[ok] calimaco procesado exitosamente: {output_key}")
         return True 
     except Exception as e:
-        print(f"[ERROR] Error en get_data_calimaco: {e}")
+        print(f"[error] error en get_data_calimaco: {e}")
         return False
         
 
 def conciliation_data(from_date, to_date):
     try:
-        s3_client = get_s3_client_with_role()
         calimaco_prefix = "digital/collectors/nuvei/calimaco/output/Calimaco_Nuvei_Ventas_"
         nuvei_prefix = "digital/collectors/nuvei/output/Nuvei_Ventas_"
 
@@ -138,7 +132,7 @@ def conciliation_data(from_date, to_date):
         nuvei_key = get_latest_file_from_s3(nuvei_prefix)
 
         if not calimaco_key or not nuvei_key:
-            print("[ALERTA] No se encontraron archivos para conciliar")
+            print("[warn] no se encontraron archivos para conciliar")
             return False
         
         print(f"[INFO] Procesando archivo Calimaco: {calimaco_key}")
@@ -162,24 +156,24 @@ def conciliation_data(from_date, to_date):
         df1['Data'] = "<==>"
         df2=df2[["FECHA","ID CALIMACO","ID PROVEEDOR","CLIENTE","MONTO","ESTADO PROVEEDOR",]]
         
-        # Logs despues del filtro
-        print(f"[DEBUG] Registros despues de filtros: {len(df2)}")
+        # logs despues del filtro
+        print(f"[debug] registros despues de filtros: {len(df2)}")
         approved_only = df2[df2['ESTADO PROVEEDOR'].isin(['Approved'])]
-        print(f"[DEBUG] Solo Approved: {len(approved_only)}")
+        print(f"[debug] solo approved: {len(approved_only)}")
         
         df2 = approved_only.drop_duplicates(subset=['ID CALIMACO'], keep='first')
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
-        print(f"[DEBUG] Despues de eliminar duplicados: {len(df2)}")
-        print(f"[DEBUG] Registros válidos Nuvei despues de filtrar fechas: {len(df2.dropna(subset=['FECHA']))}")
-        print(f"[DEBUG] Registros válidos Calimaco despues de filtrar fechas: {len(df1.dropna(subset=['Fecha']))}")
+        print(f"[debug] despues de eliminar duplicados: {len(df2)}")
+        print(f"[debug] registros validos nuvei despues de filtrar fechas: {len(df2.dropna(subset=['FECHA']))}")
+        print(f"[debug] registros validos calimaco despues de filtrar fechas: {len(df1.dropna(subset=['Fecha']))}")
         
         # filtrar registros con fechas validas antes de insertar
         df2_valid = df2.dropna(subset=['FECHA'])
         df1_valid = df1.dropna(subset=['Fecha'])
         
-        # Insertar datos del collector y Calimaco de forma dual
+        # insertar datos del collector y calimaco de forma dual
         def initial_save(session):
-            print(f"[DEBUG] Insertando registros de Nuvei y Calimaco")
+            print(f"[debug] insertando registros de nuvei y calimaco")
             if len(df2_valid) > 0:
                 bulk_upsert_collector_records_optimized(session, df2_valid, 6)  
             if len(df1_valid) > 0:
@@ -304,7 +298,7 @@ def conciliation_data(from_date, to_date):
             "no_conciliados_monto_nuvei": round(no_conciliados_nuvei["MONTO"].sum(), 2)
         }
         
-        print("[INFO] Datos obtenidos")
+        print("[info] datos obtenidos")
         for k, v in metricas.items():
             print(f"- {k}: {v}")
 
@@ -312,12 +306,8 @@ def conciliation_data(from_date, to_date):
         # Mover archivos y obtener las rutas finales
         # Nuvei
         new_nuvei_key = nuvei_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': nuvei_key},
-            Key=new_nuvei_key
-        )
-        delete_file_from_s3(nuvei_key)
+        if copy_file_in_s3(nuvei_key, new_nuvei_key):
+            delete_file_from_s3(nuvei_key)
 
         # Calimaco
         new_calimaco_key = calimaco_key.replace('/output/', '/output/processed/', 1)
@@ -328,8 +318,8 @@ def conciliation_data(from_date, to_date):
         )
         delete_file_from_s3(calimaco_key)        
         
-        # Enviar correo
-        print("[INFO] Enviando correo con resultados")
+        # enviar correo
+        print("[info] enviando correo con resultados")
         period_email = f"{from_date.strftime('%Y/%m/%d')} - {to_date.strftime('%Y/%m/%d')}"
         send_email_with_results(output_key, metricas, period_email)
         
@@ -367,11 +357,11 @@ def conciliation_data(from_date, to_date):
 
         run_on_dual_dts(final_save)
                 
-        print(f"[SUCCESS] Conciliacion completada exitosamente: {output_key}")
+        print(f"[ok] conciliacion completada exitosamente: {output_key}")
         return True      
         
     except Exception as e:
-        print(f"[ERROR] Error en conciliation_data para nuvei: {e}")
+        print(f"[error] error en conciliation_data para nuvei: {e}")
         return False
 
 
@@ -410,7 +400,7 @@ def updated_data_nuvei():
         
         # insertar datos y actualizar timestamp de forma dual
         def update_save(session):
-            print(f"[DEBUG] Insertando registros de Nuvei y Calimaco (Update)")
+            print(f"[debug] insertando registros de nuvei y calimaco (update)")
             if len(df2) > 0:
                 bulk_upsert_collector_records_optimized(session, df2, 6)  
             if len(df1) > 0:
@@ -425,7 +415,7 @@ def updated_data_nuvei():
         return True
   
     except Exception as e:
-        print(f"[ERROR] Error en updated_data_nuvei: {e}")
+        print(f"[error] error en updated_data_nuvei: {e}")
         return False
     
 

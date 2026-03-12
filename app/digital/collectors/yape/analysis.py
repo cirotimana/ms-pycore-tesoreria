@@ -63,11 +63,11 @@ def get_data_yape(from_date, to_date):
             return True
         
         else:
-            print("[✖] No se encontraron archivos CSV para consolidar.")
+            print("[error] No se encontraron archivos CSV para consolidar.")
             return False
 
     except Exception as e:
-        print(f"[✖] Error procesando datos yape: {e}")
+        print(f"[error] Error procesando datos yape: {e}")
         return False
 
 
@@ -100,7 +100,7 @@ def get_data_calimaco(from_date, to_date):
         return True
         
     except Exception as e:
-        print(f"[✖] Error en get_data_calimaco: {e}")
+        print(f"[error] Error en get_data_calimaco: {e}")
         return False
     
 ##comparar de yape Nro Pedido y de calimaco Número de compra
@@ -355,7 +355,7 @@ def conciliation_data(from_date, to_date):
         return True
         
     except Exception as e:
-        print(f"[✖] Error en conciliation_data para yape: {e}")
+        print(f"[error] Error en conciliation_data para yape: {e}")
         return False
         
         
@@ -478,11 +478,11 @@ def get_data_yape_1(from_date, to_date):
             return True
         
         else:
-            print("[✖] No se encontraron archivos CSV para consolidar.")
+            print("[error] No se encontraron archivos CSV para consolidar.")
             return False
 
     except Exception as e:
-        print(f"[✖] Error procesando datos yape: {e}")
+        print(f"[error] Error procesando datos yape: {e}")
         return False
 
 

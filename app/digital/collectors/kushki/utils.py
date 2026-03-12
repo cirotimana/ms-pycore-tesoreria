@@ -26,23 +26,23 @@ class TokenCacheKushki:
             
             if (not force_refresh and self.token and 
                 self.expires_at and now < self.expires_at):
-                print("[INFO] Usando token Kushki del cache")
+                print("[info] usando token kushki del cache")
                 return self.token
 
-            print("[INFO] Obteniendo nuevo token Kushki...")
+            print("[info] obteniendo nuevo token kushki...")
             self.token = await get_token_kushki()
             
             if self.token:
-                # Token valido por 30 minutos
+                # token valido por 30 minutos
                 self.expires_at = now + timedelta(minutes=30)
-                print(f"[INFO] Token Kushki cacheado hasta {self.expires_at}")
+                print(f"[info] token kushki cacheado hasta {self.expires_at}")
             else:
-                print("[ERROR] No se pudo obtener nuevo token Kushki")
+                print("[error] no se pudo obtener nuevo token kushki")
             
             return self.token
 
     def invalidate(self):
-        print("[INFO] Invalidando token Kushki cacheado")
+        print("[info] invalidando token kushki cacheado")
         self.token = None
         self.expires_at = None
 
@@ -61,16 +61,16 @@ async def get_token_kushki():
     
     try:
         async with async_playwright() as p:
-            print("[INFO] Lanzando navegador para Kushki")
+            print("[info] lanzando navegador para kushki")
             browser = await p.chromium.launch(
                 headless=True,
-                # args=[
-                #         "--no-sandbox",
-                #         "--disable-dev-shm-usage",
-                #         "--disable-gpu",
-                #         "--no-zygote",
-                #         "--single-process",
-                #     ]
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage", 
+                    "--disable-gpu",
+                    "--no-zygote",
+                    "--single-process",
+                ]
             )
             
             context = await browser.new_context(
@@ -91,7 +91,7 @@ async def get_token_kushki():
                 headers = request.headers
                 if 'authorization' in headers and not token_found:
                     token_found = headers['authorization']
-                    print(f"[DEBUG] Token capturado: {token_found[:20]}...")
+                    print(f"[debug] token capturado: {token_found[:20]}...")
                 # ignorar error cuando el contexto ya fue cerrado
                 try:
                     await route.continue_()
@@ -100,25 +100,25 @@ async def get_token_kushki():
 
             await context.route("**", handle_request)
 
-            print("[INFO] Navegando a Kushki")
+            print("[info] navegando a kushki")
             await page.goto("https://console.kushkipagos.com/auth", wait_until="networkidle", timeout=60000)
 
-            # Login
-            print("[INFO] Realizando login")
+            # login
+            print("[info] realizando login")
             await page.fill('input[name="username"], input[type="email"], input[type="text"]', Config.USER_NAME_KUSHKI)
             await page.fill('input[name="password"]', Config.PASSWORD_KUSHKI)
             await page.click('button[type="submit"], #kc-login')
 
-            # Esperar captura del token
-            print("[INFO] Esperando captura del token (30s max)")
+            # esperar captura del token
+            print("[info] esperando captura del token (30s max)")
             for i in range(30):
                 if token_found:
-                    print(f"[SUCCESS] Token capturado en segundo {i + 1}")
+                    print(f"[ok] token capturado en segundo {i + 1}")
                     break
                 await asyncio.sleep(1)
 
             if token_found:
-                print("[INFO] Token capturado exitosamente")
+                print("[info] token capturado exitosamente")
                 # limpiar rutas pendientes antes de cerrar el contexto
                 try:
                     await page.unroute_all(behavior='ignoreErrors')
@@ -126,7 +126,7 @@ async def get_token_kushki():
                     pass
                 return token_found
             else:
-                print("[ERROR] No se encontro token despues de 30 segundos")
+                print("[error] no se encontro token despues de 30 segundos")
                 try:
                     await page.unroute_all(behavior='ignoreErrors')
                 except Exception:
@@ -134,7 +134,7 @@ async def get_token_kushki():
                 return None
                 
     except Exception as e:
-        print(f"[ERROR] Error general en get_token_kushki: {e}")
+        print(f"[error] error general en get_token_kushki: {e}")
         return None
         
     finally:
@@ -143,13 +143,13 @@ async def get_token_kushki():
         
         try:
             await p.__aexit__(None, None, None)  
-            print("[DEBUG] Playwright cerrado completamente.")
+            print("[debug] playwright cerrado completamente.")
         except Exception:
             pass
 
 
 async def close_playwright_resources_kushki(browser, context, page):
-    print("[INFO] Cerrando recursos de Kushki...")
+    print("[info] cerrando recursos de kushki...")
     cleanup_tasks = []
     
     if page:
@@ -162,9 +162,9 @@ async def close_playwright_resources_kushki(browser, context, page):
     if cleanup_tasks:
         try:
             await asyncio.gather(*cleanup_tasks, return_exceptions=True)
-            print("[DEBUG] Recursos de Kushki cerrados correctamente")
+            print("[debug] recursos de kushki cerrados correctamente")
         except Exception as e:
-            print(f"[WARN] Error cerrando recursos de Kushki: {e}")
+            print(f"[warn] error cerrando recursos de kushki: {e}")
 
 
 # =============================
@@ -182,7 +182,7 @@ def convert_utc_to_local(utc_str):
         try:
             dt_utc = datetime.strptime(utc_str, "%Y-%m-%dT%H:%M:%S")
         except ValueError as e:
-            print(f"[INFO] Formato de fecha no reconocido: {utc_str} - Error: {str(e)}")
+            print(f"[info] formato de fecha no reconocido: {utc_str} - error: {str(e)}")
             return None
     
     dt_utc = dt_utc.replace(tzinfo=pytz.UTC)
@@ -336,7 +336,7 @@ async def get_data_json_kushki_async(token, from_date, to_date):
         current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
         file_key = f"digital/collectors/kushki/input/response_{current_time}.json"
         upload_file_to_s3(json.dumps(all_data, ensure_ascii=False).encode("utf-8"), file_key)
-        print(f"[success] archivo guardado en s3: {file_key}")
+        print(f"[ok] archivo guardado en s3: {file_key}")
 
     return len(all_data), current_token
 
@@ -352,7 +352,7 @@ def json_excel_kushki():
         if not file_key.endswith(".json") or "/input/processed/" in file_key:
             continue
 
-        print(f"[INFO] Procesando {file_key}")
+        print(f"[info] procesando {file_key}")
         try:
             content = read_file_from_s3(file_key)
             data = json.loads(content.decode("utf-8"))
@@ -365,7 +365,7 @@ def json_excel_kushki():
                 data = []
 
             if not data or not isinstance(data, list):
-                print("[INFO] No hay datos validos para procesar")
+                print("[info] no hay datos validos para procesar")
                 continue
 
             rows = []
@@ -444,13 +444,13 @@ def json_excel_kushki():
             delete_file_from_s3(file_key)
 
             processed_count += 1
-            print(f"[SUCCESS] Procesado: {file_key} -> {output_key}")
+            print(f"[ok] procesado: {file_key} -> {output_key}")
 
         except Exception as e:
-            print(f"[ERROR] Error procesando {file_key}: {e}")
+            print(f"[error] error procesando {file_key}: {e}")
             continue
 
-    print(f"[INFO] Proceso JSON -> Excel completado. Archivos procesados: {processed_count}")
+    print(f"[info] proceso json -> excel completado. archivos procesados: {processed_count}")
 
 
 # =============================
@@ -458,28 +458,28 @@ def json_excel_kushki():
 # =============================
 async def get_data_main_async(from_date, to_date):
     try:
-        print(f"[INICIO] Procesando Kushki desde {from_date} hasta {to_date}")
+        print(f"[inicio] procesando kushki desde {from_date} hasta {to_date}")
         
-        # Obtener token del cache
+        # obtener token del cache
         token = await token_cache_kushki.get_token()
         if not token:
-            print("[ERROR] No se pudo obtener token de Kushki")
+            print("[error] no se pudo obtener token de kushki")
             return False
 
-        # Descargar datos
+        # descargar datos
         data_count, final_token = await get_data_json_kushki_async(token, from_date, to_date)
         
         if data_count and data_count > 0:
-            print(f"[INFO] {data_count} registros descargados, generando archivo Excel")
+            print(f"[info] {data_count} registros descargados, generando archivo excel")
             json_excel_kushki()
-            print("[SUCCESS] Proceso Kushki completado exitosamente")
+            print("[ok] proceso kushki completado exitosamente")
             return True
         else:
-            print("[INFO] No hay datos para procesar")
+            print("[info] no hay datos para procesar")
             return False
         
     except Exception as e:
-        print(f"[ERROR] Error en get_data_main_async: {e}")
+        print(f"[error] error en get_data_main_async: {e}")
         return False
 
 
@@ -502,7 +502,7 @@ def get_data_main(from_date, to_date):
 
         print(f"\n{'='*50}")
         print(f"[fin] proceso kushki completado")
-        print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+        print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
         print(f"{'='*50}\n")
 
     return result

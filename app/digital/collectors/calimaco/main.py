@@ -67,13 +67,13 @@ async def get_session_cookies(max_attempts=10):
             print("[info calimaco] lanzando navegador")
             browser = await p.chromium.launch(
                 headless=True,
-                # args=[
-                #         "--no-sandbox",
-                #         "--disable-dev-shm-usage",
-                #         "--disable-gpu",
-                #         "--no-zygote",
-                #         "--single-process",
-                #     ]
+                args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu",
+                        "--no-zygote",
+                        "--single-process",
+                    ]
             )
             
             context = await browser.new_context(
@@ -379,7 +379,7 @@ async def run_calimaco_collector_async(from_date, to_date, method=None, collecto
         elapsed_time = _time.time() - start_time
         print(f"\n{'='*50}")
         print(f"[fin calimaco] proceso calimaco completado")
-        print(f"[tiempo calimaco] duracion total: {elapsed_time:.2f} segundos")
+        print(f"[tiempo calimaco] duracion total: {elapsed_time / 60:.2f} minutos")
         print(f"{'='*50}\n")
 
     return result

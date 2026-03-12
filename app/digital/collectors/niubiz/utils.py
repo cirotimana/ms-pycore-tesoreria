@@ -27,23 +27,23 @@ class TokenCacheNiubiz:
 
             if (not force_refresh and self.token and
                     self.expires_at and now < self.expires_at):
-                print("[INFO] Usando token Niubiz del cache")
+                print("[info] usando token niubiz del cache")
                 return self.token
 
-            print("[INFO] Obteniendo nuevo token Niubiz...")
+            print("[info] obteniendo nuevo token niubiz...")
             self.token = await get_token_niubiz_1()
 
             if self.token:
                 # token valido por 30 minutos
                 self.expires_at = now + timedelta(minutes=30)
-                print(f"[INFO] Token Niubiz cacheado hasta {self.expires_at}")
+                print(f"[info] token niubiz cacheado hasta {self.expires_at}")
             else:
-                print("[ERROR] No se pudo obtener nuevo token Niubiz")
+                print("[error] no se pudo obtener nuevo token niubiz")
 
             return self.token
 
     def invalidate(self):
-        print("[INFO] Invalidando token Niubiz cacheado")
+        print("[info] invalidando token niubiz cacheado")
         self.token = None
         self.expires_at = None
 
@@ -52,7 +52,7 @@ token_cache_niubiz = TokenCacheNiubiz()
 
 
 async def close_playwright_resources_niubiz(browser, context, page):
-    print("[INFO] Cerrando recursos de Niubiz...")
+    print("[info] cerrando recursos de niubiz...")
     cleanup_tasks = []
     
     if page:
@@ -65,9 +65,9 @@ async def close_playwright_resources_niubiz(browser, context, page):
     if cleanup_tasks:
         try:
             await asyncio.gather(*cleanup_tasks, return_exceptions=True)
-            print("[DEBUG] Recursos de Niubiz cerrados correctamente")
+            print("[debug] recursos de niubiz cerrados correctamente")
         except Exception as e:
-            print(f"[WARN] Error cerrando recursos de Niubiz: {e}")
+            print(f"[warn] error cerrando recursos de niubiz: {e}")
         
 
 
@@ -75,30 +75,30 @@ async def close_playwright_resources_niubiz(browser, context, page):
 #   OPCION JSON 
 # =============================
 async def get_token_niubiz_1(max_login_attempts=3):
-    print("[INFO] Iniciando Playwright para obtener token Niubiz")
+    print("[info] iniciando playwright para obtener token niubiz")
     browser = None
     context = None
     page = None
     
     try:
         async with async_playwright() as p:
-            print("[INFO] Lanzando navegador Chrome en modo headless")
+            print("[info] lanzando navegador chrome en modo headless")
             browser = await p.chromium.launch(
                 headless=True,
-                # args=[
-                #     "--no-sandbox",
-                #     "--disable-dev-shm-usage",
-                #     "--disable-gpu",
-                #     "--no-zygote",
-                #     "--single-process",
-                # ]
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage", 
+                    "--disable-gpu",
+                    "--no-zygote",
+                    "--single-process",
+                ]
             )
             
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             )
 
-            print("[INFO] Inyectando script para ocultar webdriver")
+            print("[info] inyectando script para ocultar webdriver")
             await context.add_init_script("""
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
@@ -113,40 +113,40 @@ async def get_token_niubiz_1(max_login_attempts=3):
                 headers = request.headers
                 if 'authorization' in headers and not token_found:
                     token_found = headers['authorization']
-                    print(f"[DEBUG] Token detectado: {token_found[:20]}...")
+                    print(f"[debug] token detectado: {token_found[:20]}...")
                 await route.continue_()
 
-            print("[INFO] Interceptando todas las requests para buscar el token")
+            print("[info] interceptando todas las requests para buscar el token")
             await context.route("**", handle_request)
 
-            print("[INFO] Navegando a https://comercio.niubiz.com.pe")
+            print("[info] navegando a https://comercio.niubiz.com.pe")
             try:
                 await page.goto("https://comercio.niubiz.com.pe", wait_until="networkidle", timeout=60000)
-                print("[INFO] Pagina cargada correctamente")
+                print("[info] pagina cargada correctamente")
             except Exception as e:
-                print(f"[ERROR] Error al cargar la pagina: {e}")
+                print(f"[error] error al cargar la pagina: {e}")
                 return None
             
             login_attempt = 0
             while login_attempt < max_login_attempts:
-                print(f"[INFO] Intento de login #{login_attempt + 1}")
+                print(f"[info] intento de login #{login_attempt + 1}")
                 
-                # Login (manteniendo la logica original que funciona)
+                # login (manteniendo la logica original que funciona)
                 try:
                     await page.fill('input[name="username"], input[type="email"], input[type="text"]', Config.USER_NAME_NIUBIZ_2)
                     await page.fill('input[name="password"], input[type="password"]', Config.PASSWORD_NIUBIZ_2)
-                    print("[INFO] Haciendo click en el boton de login")
+                    print("[info] haciendo click en el boton de login")
                     await page.click('button[type="submit"], #kc-login')
                 except Exception as e:
-                    print(f"[ERROR] Error durante el login: {e}")
+                    print(f"[error] error durante el login: {e}")
                     break
                 
-                # Esperar captura del token
-                print("[INFO] Esperando captura del token (30s max)")
+                # esperar captura del token
+                print("[info] esperando captura del token (30s max)")
                 token_capturado = False
                 for i in range(30):
                     if token_found:
-                        print(f"[SUCCESS] Token capturado en segundo {i + 1}")
+                        print(f"[ok] token capturado en segundo {i + 1}")
                         token_capturado = True
                         break
                     await asyncio.sleep(1)
@@ -154,20 +154,20 @@ async def get_token_niubiz_1(max_login_attempts=3):
                 if token_capturado:
                     break
                 
-                # Si no se obtuvo el token, refrescar y volver a intentar
-                print("[INFO] Token no detectado, refrescando pagina")
+                # si no se obtuvo el token, refrescar y volver a intentar
+                print("[info] token no detectado, refrescando pagina")
                 await page.reload(wait_until="networkidle")
                 login_attempt += 1
                 
             if token_found:
-                print("[INFO] Token capturado exitosamente")
+                print("[info] token capturado exitosamente")
                 return token_found
             else:
-                print("[ERROR] No se encontro token despues de {max_login_attempts} intentos")
+                print("[error] no se encontro token despues de {max_login_attempts} intentos")
                 return None
                 
     except Exception as e:
-        print(f"[ERROR] Error general en get_token_niubiz: {e}")
+        print(f"[error] error general en get_token_niubiz: {e}")
         return None
         
     finally:
@@ -316,29 +316,29 @@ async def get_data_json_niubiz_async(token, from_date, to_date):
 
 async def get_data_main_json_async(from_date, to_date):
     try:
-        print("[INFO] Iniciando captura de token Niubiz _ json")
-        # CORREGIDO: await directo
+        print("[info] iniciando captura de token niubiz _ json")
+        # corregido: await directo
         token = await token_cache_niubiz.get_token(type=1)
         
         if token:
-            print("[INFO] Trayendo datos de Niubiz _ json")
-            # CORREGIDO: await directo
+            print("[info] trayendo datos de niubiz _ json")
+            # corregido: await directo
             data_count = await get_data_json_niubiz_async(token, from_date, to_date)
-            print(f"[DEBUG] Datos obtenidos: {data_count}")
+            print(f"[debug] datos obtenidos: {data_count}")
             
             if data_count > 0:
-                print("[INFO] Generando archivo Excel _ del json")
+                print("[info] generando archivo excel _ del json")
                 processed_files = json_excel_niubiz()  
                 return processed_files 
             else:
-                print("[ALERTA] No hay datos para procesar en json.")
+                print("[warn] no hay datos para procesar en json.")
                 return []  
         else:
-            print("[ALERTA] No se pudo obtener el token de Niubiz en json.")
+            print("[warn] no se pudo obtener el token de niubiz en json.")
             return []  
 
     except Exception as e:
-        print(f"[✖] Error en obtener la data de Niubiz json: {e}")
+        print(f"[error] error en obtener la data de niubiz json: {e}")
         return []
 
 
@@ -361,7 +361,7 @@ def get_data_main_json(from_date, to_date):
 
         print(f"\n{'='*50}")
         print(f"[fin] proceso niubiz completado")
-        print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+        print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
         print(f"{'='*50}\n")
 
     return result
@@ -423,7 +423,7 @@ def json_excel_niubiz():
             upload_file_to_s3(buffer.getvalue(), output_key)
 
 
-        # Mover el .json a input/processed/
+        # mover el .json a input/processed/
         processed_key = file_key.replace("input/", "input/processed/", 1)
         upload_file_to_s3(content, processed_key)
         delete_file_from_s3(file_key)
@@ -431,9 +431,9 @@ def json_excel_niubiz():
         processed_files.append(output_key)
         
         ##download_file_from_s3_to_local(output_key)##solo para pruebitas
-        print(f"[INFO] Procesado: {file_key} -> {output_key} y movido a {processed_key}")
+        print(f"[info] procesado: {file_key} -> {output_key} y movido a {processed_key}")
 
-    print("[✔] Proceso Json -> Excel completado.")
+    print("[ok] proceso json -> excel completado.")
     return processed_files 
 
 

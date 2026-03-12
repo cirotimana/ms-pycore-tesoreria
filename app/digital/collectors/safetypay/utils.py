@@ -64,13 +64,13 @@ async def get_token_safetypay():
             print("[info] Lanzando navegador para SafetyPay")
             browser = await p.chromium.launch(
                 headless=True,
-                # args=[
-                #         "--no-sandbox",
-                #         "--disable-dev-shm-usage",
-                #         "--disable-gpu",
-                #         "--no-zygote",
-                #         "--single-process",
-                #     ]
+                args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu",
+                        "--no-zygote",
+                        "--single-process",
+                    ]
             )
             
             context = await browser.new_context(
@@ -528,7 +528,7 @@ def get_data_main(from_date, to_date):
     elapsed_time = time.time() - start_time
     print(f"\n{'='*50}")
     print(f"[fin] proceso safetypay completado")
-    print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
     print(f"{'='*50}\n")
     return success
 

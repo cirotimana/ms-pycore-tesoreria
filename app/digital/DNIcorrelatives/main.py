@@ -19,7 +19,7 @@ def get_main():
     max_retries = 10
     for attempt in range(max_retries):
         try:
-            print(f"DNIcorrelatives - Intento {attempt + 1} de {max_retries}")
+            print(f"[info] DNIcorrelatives - intento {attempt + 1} de {max_retries}")
             
             # configuracion inicial
             engine = engine_azure
@@ -28,7 +28,7 @@ def get_main():
             # obtener datos
             df = get_dni_data(engine, query)
             total_dni = get_total_dni_count(engine)
-            print(f"Total de registros: {total_dni}")
+            print(f"[info] total de registros: {total_dni}")
             
             if len(df) > 0:
                 # analisis de datos
@@ -37,7 +37,7 @@ def get_main():
                 # enviar resultados
                 send_email_with_results(df_final, total_dni, output_dir)
                 save_to_database(df_final, total_dni, len(df_final))
-                print(f"DNIcorrelatives - Ejecucion exitosa. {len(df_final)} registros procesados.")
+                print(f"[ok] DNIcorrelatives - ejecucion exitosa. {len(df_final)} registros procesados.")
                 return {
                     "success": True,
                     "message": f"Ejecucion exitosa. {len(df_final)} registros procesados.",
@@ -47,7 +47,7 @@ def get_main():
                 # caso sin resultados
                 send_empty_results_email(total_dni)
                 save_to_database(None, total_dni, 0)
-                print("DNIcorrelatives - Ejecucion exitosa. Sin registros para procesar.")
+                print("[ok] DNIcorrelatives - ejecucion exitosa. sin registros para procesar.")
                 return {
                     "success": True,
                     "message": "Ejecucion exitosa. Sin registros para procesar.",
@@ -57,7 +57,7 @@ def get_main():
             # Ejecucion exitosa - salir inmediatamente
             
         except Exception as e:
-            print(f"DNIcorrelatives - Error en intento {attempt + 1}: {e}")
+            print(f"[error] DNIcorrelatives - error en intento {attempt + 1}: {e}")
             if attempt < max_retries - 1:
                 print(f"DNIcorrelatives - Reintentando en 5 segundos... (intento {attempt + 2}/{max_retries})")
                 time.sleep(5)

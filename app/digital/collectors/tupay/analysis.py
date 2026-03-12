@@ -12,7 +12,7 @@ def get_data_tupay(from_date, to_date):
     try:
         get_data_main(from_date, to_date)
     except Exception as e:
-        print(f"[ALERTA] Error ejecutando la descarga de tupay: {e}")
+        print(f"[warn] error ejecutando la descarga de tupay: {e}")
         return False
     
     try:
@@ -44,18 +44,13 @@ def get_data_tupay(from_date, to_date):
                     
                     dataframes.append(df)
                     
-                    # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
                     
                 except Exception as e:
-                    print(f"[✖] Error al procesar {s3_key}: {e}")
+                    print(f"[error] error al procesar {s3_key}: {e}")
 
         if dataframes:
             consolidated_df = pd.concat(dataframes, ignore_index=True)
@@ -70,15 +65,15 @@ def get_data_tupay(from_date, to_date):
                 upload_file_to_s3(buffer.getvalue(), output_key)
             ##download_file_from_s3_to_local(output_key)
             
-            print(f"[SUCCESS] Tupay procesado exitosamente: {output_key}")
+            print(f"[ok] tupay procesado exitosamente: {output_key}")
             return True 
       
         else:
-            print("[✖] No se encontraron archivos Excel para consolidar.")
+            print("[error] no se encontraron archivos excel para consolidar")
             return False
 
     except Exception as e:
-        print(f"[✖] Error procesando datos Tupay: {e}")
+        print(f"[error] error procesando datos tupay: {e}")
         return False 
         
 def get_data_calimaco(from_date, to_date):
@@ -106,18 +101,16 @@ def get_data_calimaco(from_date, to_date):
         ##download_file_from_s3_to_local(output_key)
         delete_file_from_s3(calimaco_key)
         
-        print(f"[SUCCESS] Calimaco procesado exitosamente: {output_key}")
+        print(f"[ok] calimaco procesado exitosamente: {output_key}")
         return True
 
     except Exception as e:
-        print(f"[✖] Error en get_data_calimaco: {e}")
+        print(f"[error] error en get_data_calimaco: {e}")
         return False
         
         
 def conciliation_data(from_date, to_date):
     try:
-        
-        s3_client = get_s3_client_with_role()
         calimaco_prefix = "digital/collectors/tupay/calimaco/output/Calimaco_Tupay_Ventas_"
         tupay_prefix = "digital/collectors/tupay/output/Tupay_Ventas_"
 
@@ -125,7 +118,7 @@ def conciliation_data(from_date, to_date):
         tupay_key = get_latest_file_from_s3(tupay_prefix)
 
         if not calimaco_key or not tupay_key:
-            print("[ALERTA] No se encontraron archivos para conciliar")
+            print("[warn] no se encontraron archivos para conciliar")
             return False
 
         print(f"[INFO] Procesando archivo Calimaco: {calimaco_key}")
@@ -291,25 +284,17 @@ def conciliation_data(from_date, to_date):
         # mover a procesados
         # Tupay
         new_tupay_key = tupay_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': tupay_key},
-            Key=new_tupay_key
-        )
-        delete_file_from_s3(tupay_key)
+        if copy_file_in_s3(tupay_key, new_tupay_key):
+            delete_file_from_s3(tupay_key)
 
         # Calimaco
         new_calimaco_key = calimaco_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': calimaco_key},
-            Key=new_calimaco_key
-        )
-        delete_file_from_s3(calimaco_key)
+        if copy_file_in_s3(calimaco_key, new_calimaco_key):
+            delete_file_from_s3(calimaco_key)
 
-        ## Enviamos el reporte
-        print("[INFO] Enviando correo con resultados...")       
-        period_email = f"{from_date.strftime("%Y/%m/%d")} - {to_date.strftime("%Y/%m/%d")}"
+        # enviamos el reporte
+        print("[info] enviando correo con resultados...")       
+        period_email = f"{from_date.strftime('%Y/%m/%d')} - {to_date.strftime('%Y/%m/%d')}"
         send_email_with_results(output_key, metricas, period_email)
         
         # convierte ambas a date (YYYY-MM-DD)
@@ -347,11 +332,11 @@ def conciliation_data(from_date, to_date):
 
         run_on_dual_dts(final_save)
                 
-        print(f"[SUCCESS] Conciliación completada exitosamente: {output_key}")
+        print(f"[ok] conciliacion completada exitosamente: {output_key}")
         return True        
         
     except Exception as e:
-        print(f"[✖] Error en conciliation_data para tupay: {e}")
+        print(f"[error] error en conciliation_data para tupay: {e}")
         return False
 
 def updated_data_tupay():
@@ -364,7 +349,7 @@ def updated_data_tupay():
         tupay_key = get_latest_file_from_s3(tupay_prefix)
 
         if not calimaco_key or not tupay_key:
-            print("[ALERTA] No se encontraron archivos para actualizar")
+            print("[warn] no se encontraron archivos para actualizar")
             return False
 
         print(f"[INFO] Procesando archivo Calimaco: {calimaco_key}")
@@ -405,11 +390,11 @@ def updated_data_tupay():
         delete_file_from_s3(tupay_key)
         delete_file_from_s3(calimaco_key)
         
-        print("[SUCCESS] Proceso exitoso para la actualizacion de Tupay")
+        print("[ok] proceso exitoso para la actualizacion de tupay")
         return True
   
     except Exception as e:
-        print(f"[ERROR] Error en updated_data_tupay: {e}")
+        print(f"[error] error en updated_data_tupay: {e}")
         return False
 
 

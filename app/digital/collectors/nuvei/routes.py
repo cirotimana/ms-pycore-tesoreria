@@ -20,7 +20,7 @@ router = APIRouter()
 @redis_lock("nuvei-process")
 def execute_get_nuvei(from_date: str = None, to_date: str = None):
     try:
-        # Aunque el main es async, la tarea de Celery se lanza de forma síncrona aquí (.delay)
+        # aunque el main es async, la tarea de celery se lanza de forma sincrona aqui (.delay)
         task = task_process_nuvei.delay(from_date, to_date)
         logger.info(LOG_TASK_STARTED.format(task_name="task_process_nuvei", task_id=task.id))
         

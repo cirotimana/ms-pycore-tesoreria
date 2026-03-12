@@ -63,13 +63,13 @@ async def get_token_pagoefectivo():
             print("[INFO] Lanzando navegador para PagoEfectivo")
             browser = await p.chromium.launch(
                 headless=True,
-                # args=[
-                #         "--no-sandbox",
-                #         "--disable-dev-shm-usage",
-                #         "--disable-gpu",
-                #         "--no-zygote",
-                #         "--single-process",
-                #     ]
+                args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu",
+                        "--no-zygote",
+                        "--single-process",
+                    ]
             )
             
             context = await browser.new_context(
@@ -119,10 +119,10 @@ async def get_token_pagoefectivo():
                 await asyncio.sleep(1)
 
             if token_found:
-                print("[✔] Token capturado exitosamente.")
+                print("[ok] Token capturado exitosamente.")
                 return token_found
             else:
-                print("[✖] No se encontro token despues de 30 segundos.")
+                print("[error] No se encontro token despues de 30 segundos.")
                 return None
                 
     except Exception as e:
@@ -507,7 +507,7 @@ def get_main_pagoefectivo(from_date, to_date):
     elapsed_time = time.time() - start_time
     print(f"\n{'='*50}")
     print(f"[fin] proceso pagoefectivo completado")
-    print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
     print(f"{'='*50}\n")
     return result
 
@@ -760,7 +760,7 @@ def json_excel_pagoefectivo():
 
         print(f"[INFO] Procesado: {file_key} -> {output_key} y movido a {processed_key}")
 
-    print("[✔] Proceso Json -> Excel completado.")
+    print("[ok] Proceso Json -> Excel completado.")
 
 
 def get_data_main_json(from_date, to_date):
@@ -793,7 +793,7 @@ def get_data_main_json(from_date, to_date):
     elapsed_time = time.time() - start_time
     print(f"\n{'='*50}")
     print(f"[fin] proceso pagoefectivo completado")
-    print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
     print(f"{'='*50}\n")
     return success
 

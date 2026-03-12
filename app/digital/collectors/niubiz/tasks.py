@@ -4,7 +4,7 @@ from app.common.redis_lock import release_lock
 
 @celery_app.task(bind=True, name="niubiz.process_etl")
 def task_process_niubiz(self, from_date, to_date):
-    print(f"[WORKER] Iniciando tarea Niubiz (ID: {self.request.id}) para rango: {from_date} - {to_date}")
+    print(f"[worker] iniciando tarea niubiz (id: {self.request.id}) para rango: {from_date} - {to_date}")
     try:
         result = get_main_niubiz(from_date, to_date)
         return result

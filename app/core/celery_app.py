@@ -15,7 +15,7 @@ celery_app = Celery(
 celery_app.conf.update(
     task_track_started=True,
     task_time_limit=CELERY_TASK_TIMEOUT,  # 4 horas maximo por tarea (desde constants.py)
-    worker_prefetch_multiplier=1, # Un worker toma una tarea a la vez (crucial para Pandas)
+    worker_prefetch_multiplier=1, # un worker toma una tarea a la vez (crucial para pandas)
     task_acks_late=True,
     broker_connection_retry_on_startup=True
 )

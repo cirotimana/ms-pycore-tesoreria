@@ -46,10 +46,10 @@ async def get_id_async(bearer_cookie, from_date, to_date):
            
             return ids 
         else:
-            print(f"[✖] Error {response.status_code}: {response.text}")
+            print(f"[error] Error {response.status_code}: {response.text}")
             return []
     except Exception as e:
-        print(f"[✖] Excepcion durante la llamada en tupay: {e}")
+        print(f"[error] Excepcion durante la llamada en tupay: {e}")
         return []
 
 async def export_settlement_to_s3_async(bearer_cookie, id):
@@ -72,7 +72,7 @@ async def export_settlement_to_s3_async(bearer_cookie, id):
             storage_url = export_data.get("url")
 
             if not storage_url:
-                print(f"[✖] No se recibio url en la respuesta: {export_data}")
+                print(f"[error] No se recibio url en la respuesta: {export_data}")
                 return None
 
             file_resp = requests.get(storage_url, timeout=500)
@@ -85,14 +85,14 @@ async def export_settlement_to_s3_async(bearer_cookie, id):
                     upload_file_to_s3(buffer.getvalue(), output_key)
                 return output_key
             else:
-                print(f"[✖] Error al descargar archivo real: {file_resp.status_code}")
+                print(f"[error] Error al descargar archivo real: {file_resp.status_code}")
                 return None
         else:
-            print(f"[✖] Error al exportar {id}: {response.status_code} - {response.text}")
+            print(f"[error] Error al exportar {id}: {response.status_code} - {response.text}")
             return None
 
     except Exception as e:
-        print(f"[✖] Excepcion al exportar {id}: {e}")
+        print(f"[error] Excepcion al exportar {id}: {e}")
         return None
 
 async def get_data_liq_async(from_date, to_date): 
@@ -270,7 +270,7 @@ def get_data_tupay(from_date, to_date):
                         delete_file_from_s3(s3_key)
                     
                 except Exception as e:
-                    print(f"[✖] Error al procesar {s3_key}: {e}")
+                    print(f"[error] Error al procesar {s3_key}: {e}")
 
         if dataframes:
             consolidated_df = pd.concat(dataframes, ignore_index=True)
@@ -294,11 +294,11 @@ def get_data_tupay(from_date, to_date):
             return True
       
         else:
-            print("[✖] No se encontraron archivos Excel para consolidar.")
+            print("[error] No se encontraron archivos Excel para consolidar.")
             return False
 
     except Exception as e:
-        print(f"[✖] Error procesando datos Tupay: {e}")
+        print(f"[error] Error procesando datos Tupay: {e}")
         return False
        
        

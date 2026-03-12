@@ -14,17 +14,16 @@ import pytz
 
 
 def get_data_pagoefectivo(from_date, to_date, method = 'CNC'):
-    s3_client = get_s3_client_with_role()
     try:
         if method == 'UP':
             get_data_main_json( from_date, to_date)
         elif method == 'CNC':
             get_main_pagoefectivo(from_date, to_date)
         else:
-            print(f"[ALERTA] Metodo desconocido: {method}")
+            print(f"[warn] metodo desconocido: {method}")
             return False
     except Exception as e:
-        print(f"[ALERTA] Error ejecutando la descarga de pagoefectivo: {e}")
+        print(f"[warn] error ejecutando la descarga de pagoefectivo: {e}")
         return False
     
     try:
@@ -62,7 +61,7 @@ def get_data_pagoefectivo(from_date, to_date, method = 'CNC'):
                         delete_file_from_s3(s3_key)
                     
                 except Exception as e:
-                    print(f"[✖] Error al procesar {s3_key}: {e}")
+                    print(f"[error] Error al procesar {s3_key}: {e}")
                     
             elif s3_key.endswith('.csv') and '/input/processed/' not in s3_key:
                 try:
@@ -92,7 +91,7 @@ def get_data_pagoefectivo(from_date, to_date, method = 'CNC'):
                         delete_file_from_s3(s3_key)
                     
                 except Exception as e:
-                    print(f"[✖] Error al procesar {s3_key}: {e}")
+                    print(f"[error] Error al procesar {s3_key}: {e}")
 
         if dataframes:
             consolidated_df = pd.concat(dataframes, ignore_index=True)
@@ -113,14 +112,14 @@ def get_data_pagoefectivo(from_date, to_date, method = 'CNC'):
                 upload_file_to_s3(buffer.getvalue(), output_key)
             
             # download_file_from_s3_to_local(output_key)##para pruebitas lo guardo en local
-            print(f"[SUCCESS] PagoEfectivo procesado exitosamente: {output_key}")
+            print(f"[ok] pagoefectivo procesado exitosamente: {output_key}")
             return True
         else:
-            print("[✖] No se encontraron archivos Excel para consolidar.")
+            print("[error] no se encontraron archivos excel para consolidar")
             return False
 
     except Exception as e:
-        print(f"[✖] Error procesando datos Pagoefectivo: {e}")
+        print(f"[error] Error procesando datos Pagoefectivo: {e}")
         return False
     
 
@@ -148,18 +147,16 @@ def get_data_calimaco(from_date, to_date ):
             upload_file_to_s3(buffer.getvalue(), output_key)
             
         delete_file_from_s3(calimaco_key)
-        print(f"[SUCCESS] Calimaco procesado exitosamente: {output_key}")
+        print(f"[ok] calimaco procesado exitosamente: {output_key}")
         return True 
     except Exception as e:
-        print(f"[✖] Error en get_data_calimaco: {e}")
+        print(f"[error] error en get_data_calimaco: {e}")
         return False
     
 
 def conciliation_data(from_date , to_date ):
     try:
-        
         # archivos de donde se alimentaran los df
-        s3_client = get_s3_client_with_role()
         calimaco_prefix = "digital/collectors/pagoefectivo/calimaco/output/Calimaco_PagoEfectivo_Ventas_"
         pagoefectivo_prefix = "digital/collectors/pagoefectivo/output/PagoEfectivo_Ventas_"
 
@@ -167,11 +164,11 @@ def conciliation_data(from_date , to_date ):
         pagoefectivo_key = get_latest_file_from_s3(pagoefectivo_prefix)
 
         if not calimaco_key or not pagoefectivo_key:
-            print("[ALERTA] No se encontraron archivos para conciliar")
+            print("[warn] no se encontraron archivos para conciliar")
             return False
 
-        print(f"[INFO] Procesando archivo Calimaco: {calimaco_key}")
-        print(f"[INFO] Procesando archivo Pagoefectivo: {pagoefectivo_key}")
+        print(f"[info] procesando archivo calimaco: {calimaco_key}")
+        print(f"[info] procesando archivo pagoefectivo: {pagoefectivo_key}")
 
         # leer archivos directamente desde S3
         calimaco_content = read_file_from_s3(calimaco_key)
@@ -331,21 +328,13 @@ def conciliation_data(from_date , to_date ):
         # Mover archivos y obtener las rutas finales
         # Pagoefectivo
         new_pagoefectivo_key = pagoefectivo_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': pagoefectivo_key},
-            Key=new_pagoefectivo_key
-        )
-        delete_file_from_s3(pagoefectivo_key)
+        if copy_file_in_s3(pagoefectivo_key, new_pagoefectivo_key):
+            delete_file_from_s3(pagoefectivo_key)
 
         # Calimaco
         new_calimaco_key = calimaco_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': calimaco_key},
-            Key=new_calimaco_key
-        )
-        delete_file_from_s3(calimaco_key)
+        if copy_file_in_s3(calimaco_key, new_calimaco_key):
+            delete_file_from_s3(calimaco_key)
 
         
         ## Enviamos el correo con los adjuntos
@@ -393,11 +382,11 @@ def conciliation_data(from_date , to_date ):
 
         run_on_dual_dts(final_save)
         
-        print(f"[SUCCESS] Conciliacion completada exitosamente: {output_key}")
+        print(f"[ok] conciliacion completada exitosamente: {output_key}")
         return True
   
     except Exception as e:
-        print(f"[✖] Error en conciliation_data para pagoefectivo: {e}")
+        print(f"[error] error en conciliation_data para pagoefectivo: {e}")
         return False
 
 
@@ -411,11 +400,11 @@ def updated_data_pagoefectivo():
         pagoefectivo_key = get_latest_file_from_s3(pagoefectivo_prefix)
 
         if not calimaco_key or not pagoefectivo_key:
-            print("[ALERTA] No se encontraron archivos para actualizar")
+            print("[warn] no se encontraron archivos para actualizar")
             return False
 
-        print(f"[INFO] Procesando archivo Calimaco: {calimaco_key}")
-        print(f"[INFO] Procesando archivo Pagoefectivo: {pagoefectivo_key}")
+        print(f"[info] procesando archivo calimaco: {calimaco_key}")
+        print(f"[info] procesando archivo pagoefectivo: {pagoefectivo_key}")
 
         # leer archivos directamente desde S3
         calimaco_content = read_file_from_s3(calimaco_key)
@@ -450,10 +439,10 @@ def updated_data_pagoefectivo():
         delete_file_from_s3(pagoefectivo_key)
         delete_file_from_s3(calimaco_key)
         
-        print("[SUCCESS] Proceso de actualizacion pagoefectivo exitoso")
+        print("[ok] proceso de actualizacion pagoefectivo exitoso")
         return True
   
     except Exception as e:
-        print(f"[ERROR] Error en updated_data_pagoefectivo: {e}")
+        print(f"[error] error en updated_data_pagoefectivo: {e}")
         return False
 

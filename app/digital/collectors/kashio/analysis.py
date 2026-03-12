@@ -15,7 +15,7 @@ def get_data_kashio(from_date, to_date):
     try:
         get_data_main(from_date, to_date)
     except Exception as e:
-        print(f"[ALERTA] Error ejecutando la descarga de kashio: {e}")
+        print(f"[warn] error ejecutando la descarga de kashio: {e}")
         return False
 
     try:
@@ -62,15 +62,15 @@ def get_data_kashio(from_date, to_date):
                 buffer.seek(0)
                 upload_file_to_s3(buffer.getvalue(), output_key)
                 
-            print(f"[SUCCESS] Kashio procesado exitosamente: {output_key}")
+            print(f"[ok] kashio procesado exitosamente: {output_key}")
             return True 
 
         else:
-            print("[ALERTA] No se encontraron archivos Excel para consolidar.")
+            print("[warn] no se encontraron archivos excel para consolidar")
             return False
 
     except Exception as e:
-        print(f"[✖] Error procesando datos Kashio: {e}")
+        print(f"[error] error procesando datos kashio: {e}")
         return False
 
 
@@ -105,7 +105,7 @@ def get_data_calimaco(from_date, to_date):
 
         delete_file_from_s3(calimaco_key)
         
-        print(f"[SUCCESS] Calimaco procesado exitosamente: {output_key}")
+        print(f"[ok] calimaco procesado exitosamente: {output_key}")
         return True
 
     except Exception as e:
@@ -334,11 +334,11 @@ def conciliation_data(from_date, to_date):
         run_on_dual_dts(final_save)
             
             
-        print(f"[SUCCESS] Conciliacion completada exitosamente: {output_key}")
+        print(f"[ok] conciliacion completada exitosamente: {output_key}")
         return True
     
     except Exception as e:
-        print(f"[ERROR] Error en conciliation_data: {e}")
+        print(f"[error] error en conciliation_data: {e}")
         return False
     
     
@@ -392,7 +392,7 @@ def updated_data_kashio():
         delete_file_from_s3(kashio_key)
         delete_file_from_s3(calimaco_key)
         
-        print("[SUCCESS] Proceso de actualizacion completado")
+        print("[ok] proceso de actualizacion completado")
         return True
   
     except Exception as e:

@@ -1,8 +1,8 @@
-from datetime import datetime
+﻿from datetime import datetime
 import pytz
 import os
 from app.config import Config
-from app.common.mail import sendMailOffice365
+from app.common.mail import send_mail_office_365
 
 def send_email_with_results(df, total_ip, output_dir):
     """Envia un correo con los resultados del analisis"""
@@ -25,11 +25,11 @@ def send_email_with_results(df, total_ip, output_dir):
 
         # nivel de riesgo
         if registros >= 20:
-            nivel_riesgo = "🔴 ALTO"
+            nivel_riesgo = "ðŸ”´ ALTO"
         elif registros >= 10:
-            nivel_riesgo = "🟡 MEDIO"
+            nivel_riesgo = "ðŸŸ¡ MEDIO"
         else:
-            nivel_riesgo = "🟢 BAJO"
+            nivel_riesgo = "ðŸŸ¢ BAJO"
         
         html_table_rows += f"""
         <tr>
@@ -44,7 +44,7 @@ def send_email_with_results(df, total_ip, output_dir):
     
     # construir mensaje
     subject = f'Concentracion IP - Registros {current_time}'
-    recipients = Config.CORREO_CONCENTRACIONIP.split(',')
+    recipients = Config.EMAIL_IP_CONCENTRATION.split(',')
     mensaje_html = f"""
         <!DOCTYPE html>
         <html>
@@ -56,8 +56,8 @@ def send_email_with_results(df, total_ip, output_dir):
             <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#FF0000">
                 <tr>
                     <td align="center" style="padding: 20px;">
-                        <h1 style="color: #FFFFFF; margin: 0; font-size: 24px;">Reporte de Concentración de IP</h1>
-                        <p style="color: #FFFFFF; margin: 10px 0 0;">Detección de posibles actividades inusuales - Últimos 3 días</p>
+                        <h1 style="color: #FFFFFF; margin: 0; font-size: 24px;">Reporte de ConcentraciÃ³n de IP</h1>
+                        <p style="color: #FFFFFF; margin: 10px 0 0;">DetecciÃ³n de posibles actividades inusuales - Ãšltimos 3 dÃ­as</p>
                     </td>
                 </tr>
             </table>
@@ -66,20 +66,20 @@ def send_email_with_results(df, total_ip, output_dir):
             <table width="100%" cellpadding="25" cellspacing="0" bgcolor="#FFFFFF" style="border: 1px solid #e0e0e0; border-top: none;">
                 <tr>
                     <td>
-                        <!-- Introducción -->
+                        <!-- IntroducciÃ³n -->
                         <table width="100%" cellpadding="0" cellspacing="0">
                             <tr>
                                 <td style="padding-bottom: 20px;">
                                     <p style="margin: 0; color: #000000; line-height: 1.6;">
-                                        Se envía la información de concentración de IP de los registros digitales de los últimos 3 días 
-                                        que presenten más de 5 registros por dirección IP, lo cual puede indicar actividad inusual 
-                                        que requiere atención.
+                                        Se envÃ­a la informaciÃ³n de concentraciÃ³n de IP de los registros digitales de los Ãºltimos 3 dÃ­as 
+                                        que presenten mÃ¡s de 5 registros por direcciÃ³n IP, lo cual puede indicar actividad inusual 
+                                        que requiere atenciÃ³n.
                                     </p>
                                 </td>
                             </tr>
                         </table>
                         
-                        <!-- Estadísticas principales -->
+                        <!-- EstadÃ­sticas principales -->
                         <table width="100%" cellpadding="0" cellspacing="0">
                             <tr>
                                 <td width="33%" valign="top" style="padding: 0 10px;">
@@ -123,7 +123,7 @@ def send_email_with_results(df, total_ip, output_dir):
                                     
                                     <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin-top: 15px; border: 1px solid #d0d0d0;">
                                         <tr>
-                                            <th style="background-color: #FF0000; color: #FFFFFF; padding: 12px 15px; text-align: left; border: 1px solid #d0d0d0;">Dirección IP</th>
+                                            <th style="background-color: #FF0000; color: #FFFFFF; padding: 12px 15px; text-align: left; border: 1px solid #d0d0d0;">DirecciÃ³n IP</th>
                                             <th style="background-color: #FF0000; color: #FFFFFF; padding: 12px 15px; text-align: center; border: 1px solid #d0d0d0;">Cantidad de Registros</th>
                                             <th style="background-color: #FF0000; color: #FFFFFF; padding: 12px 15px; text-align: center; border: 1px solid #d0d0d0;">Nivel de Riesgo</th>
                                         </tr>
@@ -133,13 +133,13 @@ def send_email_with_results(df, total_ip, output_dir):
                             </tr>
                         </table>
                         
-                        <!-- Información adicional -->
+                        <!-- InformaciÃ³n adicional -->
                         <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px;">
                             <tr>
                                 <td style="background-color: #f8f9fa; border-left: 4px solid #FF0000; border-radius: 4px; padding: 15px;">
                                     <h3 style="color: #FF0000; margin-top: 0;">Resumen del Reporte</h3>
                                     <p style="color: #000000; margin: 10px 0; line-height: 1.5;">
-                                        Este reporte incluye un archivo CSV adjunto con el detalle completo con las ips detectadas en el período de 72 horas para su análisis detallado.
+                                        Este reporte incluye un archivo CSV adjunto con el detalle completo con las ips detectadas en el perÃ­odo de 72 horas para su anÃ¡lisis detallado.
                                     </p>
                                 </td>
                             </tr>
@@ -151,7 +151,7 @@ def send_email_with_results(df, total_ip, output_dir):
                                 <td style="background-color: #fff8f8; border-left: 4px solid #FF0000; border-radius: 4px; padding: 15px;">
                                     <h3 style="color: #FF0000; margin-top: 0;">Acciones Recomendadas</h3>
                                     <ul style="color: #000000; margin: 10px 0; padding-left: 20px;">
-                                        <li>Verificar la legitimidad de las IPs con mayor número de registros</li>
+                                        <li>Verificar la legitimidad de las IPs con mayor nÃºmero de registros</li>
                                         <li>Analizar patrones de comportamiento inusual</li>
                                         <li>Considerar implementar medidas de seguridad adicionales para IPs sospechosas</li>
                                     </ul>
@@ -159,12 +159,12 @@ def send_email_with_results(df, total_ip, output_dir):
                             </tr>
                         </table>
                         
-                        <!-- Pie de página -->
+                        <!-- Pie de pÃ¡gina -->
                         <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px;">
                             <tr>
                                 <td align="center" style="padding-top: 20px; color: #666666; font-size: 12px; border-top: 1px solid #e0e0e0;">
-                                    <p>Reporte generado automáticamente - {hora_actual}</p>
-                                    <p style="margin: 10px 0 0; font-size: 12px; color: #666;">Prevención de Fraude - Optimización Operativa<br>© {anio_actual}</p>
+                                    <p>Reporte generado automÃ¡ticamente - {hora_actual}</p>
+                                    <p style="margin: 10px 0 0; font-size: 12px; color: #666;">PrevenciÃ³n de Fraude - OptimizaciÃ³n Operativa<br>Â© {anio_actual}</p>
                                 </td>
                             </tr>
                         </table>
@@ -176,19 +176,20 @@ def send_email_with_results(df, total_ip, output_dir):
     """
     
     # enviar correo
-    sendMailOffice365(Config.SMTP_USER, subject, mensaje_html, recipients, [csv_file_path])
+    send_mail_office_365(Config.SMTP_USER, subject, mensaje_html, recipients, [csv_file_path])
 
 
 def send_empty_results_email(total_ip):
     """Envia un correo cuando no hay resultados"""
     current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d_%H%M') + '00'
     subject = f'Concentracion IP - Registros {current_time}'
-    recipients = Config.CORREO_CONCENTRACIONIP.split(',')
+    recipients = Config.EMAIL_IP_CONCENTRATION.split(',')
     mensaje_html = f"""
         <html><body>
         <p>No se encontraron concentraciones de IP en los ultimos 3 dias con mas de 5 registros por IP.</p>
         <p>Total de registros analizados: {total_ip}</p>
         </body></html>
     """
-    sendMailOffice365(Config.SMTP_USER, subject, mensaje_html, recipients)
+    send_mail_office_365(Config.SMTP_USER, subject, mensaje_html, recipients)
     
+

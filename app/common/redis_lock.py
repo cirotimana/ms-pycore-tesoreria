@@ -5,7 +5,7 @@ from functools import wraps
 from fastapi import HTTPException, status
 from app.common.constants import LOG_TASK_FAILURE
 
-# Configuracion de Redis
+# configuracion de redis
 REDIS_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 redis_client = redis.from_url(REDIS_URL)
 
@@ -24,8 +24,8 @@ def redis_lock(lock_name_prefix: str, expire: int = 14400):
                     status_code=status.HTTP_409_CONFLICT,
                     detail={
                         "status": "locked",
-                        "message": f"El proceso para {collector} ya se encuentra en ejecucion o en cola.",
-                        "suggestion": "Por favor, espere a que la ejecucion actual termine."
+                        "message": f"el proceso para {collector} ya se encuentra en ejecucion o en cola.",
+                        "suggestion": "por favor, espere a que la ejecucion actual termine."
                     }
                 )
             

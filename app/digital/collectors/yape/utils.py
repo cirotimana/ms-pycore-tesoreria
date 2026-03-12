@@ -32,7 +32,7 @@ class TokenCacheYape:
                 print("[INFO] Usando token Yape del cache")
                 return self.token
 
-            print(f"[INFO] Obteniendo nuevo token Yape tipo {type}...")
+            print(f"[info] obteniendo nuevo token yape tipo {type}...")
             if type == 1:
                 self.token = await get_token_yape_1()
             else:
@@ -60,7 +60,7 @@ token_cache_yape = TokenCacheYape()
 
 # paso 1 obtenemos token##
 async def get_token_yape_2(max_login_attempts=5):
-    print("[INFO] Iniciando Playwright para obtener token Yape")
+    print("[info] iniciando playwright para obtener token yape")
     
     browser = None
     context = None
@@ -68,23 +68,23 @@ async def get_token_yape_2(max_login_attempts=5):
     
     try:
         async with async_playwright() as p:
-            print("[INFO] Lanzando navegador para Yape")
+            print("[info] lanzando navegador para yape")
             browser = await p.chromium.launch(
                 headless=True,
-                # args=[
-                #     "--no-sandbox",
-                #     "--disable-dev-shm-usage",
-                #     "--disable-gpu",
-                #     "--no-zygote",
-                #     "--single-process",
-                # ]
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage", 
+                    "--disable-gpu",
+                    "--no-zygote",
+                    "--single-process",
+                ]
             )
             
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             )
 
-            print("[INFO] Inyectando script para ocultar webdriver")
+            print("[info] inyectando script para ocultar webdriver")
             await context.add_init_script("""
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
@@ -99,13 +99,13 @@ async def get_token_yape_2(max_login_attempts=5):
                 headers = request.headers
                 if 'authorization' in headers and not token_found:
                     token_found = headers['authorization']
-                    print(f"[DEBUG] Token detectado: {token_found[:20]}...")
+                    print(f"[debug] token detectado: {token_found[:20]}...")
                 await route.continue_()
 
-            print("[INFO] Interceptando todas las requests para buscar el token")
+            print("[info] interceptando todas las requests para buscar el token")
             await context.route("**", handle_request)
 
-            print("[INFO] Navegando a https://www.niubizenlinea.com.pe/")
+            print("[info] navegando a https://www.niubizenlinea.com.pe/")
             try:
                 await page.goto("https://www.niubizenlinea.com.pe/", wait_until="networkidle", timeout=60000)
                 print("[INFO] Pagina cargada correctamente")
@@ -115,14 +115,14 @@ async def get_token_yape_2(max_login_attempts=5):
 
             async def intentar_login_yape():
                 try:
-                    print("[DEBUG] Esperando que los campos esten visibles...")
+                    print("[debug] esperando que los campos esten visibles...")
                     await asyncio.sleep(3)
                     
                     # Cerrar modal de cookies si existe
                     try:
                         cookie_modal = await page.query_selector('#CybotCookiebotDialog')
                         if cookie_modal:
-                            print("[DEBUG] Modal de cookies detectado, intentando cerrar...")
+                            print("[debug] modal de cookies detectado, intentando cerrar...")
                             
                             # Intentar hacer clic en "Aceptar todas"
                             cookie_buttons = [
@@ -648,7 +648,7 @@ async def get_data_main_async_2(from_date, to_date):
             print("[ALERTA] No se pudo obtener el token de Yape.")
             
     except Exception as e:
-        print(f"[✖] Error en obtener la data de Yape: {e}")
+        print(f"[error] Error en obtener la data de Yape: {e}")
     
 
 def get_data_main_2(from_date, to_date):
@@ -667,7 +667,7 @@ def get_data_main_2(from_date, to_date):
     elapsed_time = time.time() - start_time
     print(f"\n{'='*50}")
     print(f"[fin] proceso yape completado")
-    print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
     print(f"{'='*50}\n")
     return result
 
@@ -689,7 +689,7 @@ def save_dfs_to_excel(writer, dfs_dict, chunk_size=1_000_000):
 #   OPCION JSON 
 # =============================
 async def get_token_yape_1(max_login_attempts=3):
-    print("[INFO] Iniciando Playwright para obtener token Yape")
+    print("[info] iniciando playwright para obtener token yape")
     browser = None
     context = None
     page = None
@@ -699,20 +699,20 @@ async def get_token_yape_1(max_login_attempts=3):
             print("[INFO] Lanzando navegador Chrome en modo headless")
             browser = await p.chromium.launch(
                 headless=True,
-                # args=[
-                #     "--no-sandbox",
-                #     "--disable-dev-shm-usage",
-                #     "--disable-gpu",
-                #     "--no-zygote",
-                #     "--single-process",
-                # ]
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage", 
+                    "--disable-gpu",
+                    "--no-zygote",
+                    "--single-process",
+                ]
             )
             
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             )
 
-            print("[INFO] Inyectando script para ocultar webdriver")
+            print("[info] inyectando script para ocultar webdriver")
             await context.add_init_script("""
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
@@ -727,7 +727,7 @@ async def get_token_yape_1(max_login_attempts=3):
                 headers = request.headers
                 if 'authorization' in headers and not token_found:
                     token_found = headers['authorization']
-                    print(f"[DEBUG] Token detectado: {token_found[:20]}...")
+                    print(f"[debug] token detectado: {token_found[:20]}...")
                 await route.continue_()
 
             print("[INFO] Interceptando todas las requests para buscar el token")
@@ -938,7 +938,7 @@ async def get_data_json_yape_async(token, from_date, to_date):
         file_key = f"digital/collectors/yape/input/response_{current_time}.json"
 
         upload_file_to_s3(json.dumps(all_data, ensure_ascii=False).encode("utf-8"), file_key)
-        print(f"[✔] Archivo guardado en S3: {file_key} con {len(all_data)} registros")
+        print(f"[ok] Archivo guardado en S3: {file_key} con {len(all_data)} registros")
         ##download_file_from_s3_to_local(file_key)  # pruebitas
     return len(all_data)
 
@@ -968,7 +968,7 @@ async def get_data_main_json_async(from_date, to_date):
             return []  
 
     except Exception as e:
-        print(f"[✖] Error en obtener la data de Yape json: {e}")
+        print(f"[error] Error en obtener la data de Yape json: {e}")
         return []
 
 
@@ -988,7 +988,7 @@ def get_data_main_json(from_date, to_date):
     elapsed_time = time.time() - start_time
     print(f"\n{'='*50}")
     print(f"[fin] proceso yape json completado")
-    print(f"[tiempo] duracion total: {elapsed_time:.2f} segundos")
+    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
     print(f"{'='*50}\n")
     return result
 
@@ -1060,7 +1060,7 @@ def json_excel_yape():
         ##download_file_from_s3_to_local(output_key)##solo para pruebitas
         print(f"[INFO] Procesado: {file_key} -> {output_key} y movido a {processed_key}")
 
-    print("[✔] Proceso Json -> Excel completado.")
+    print("[ok] Proceso Json -> Excel completado.")
     return processed_files 
 
 

@@ -11,7 +11,7 @@ import pandas as pd
 
 
 # ============================================================================
-# MOTORES Y SESIONES DE BASE DE DATOS
+# motores y sesiones de base de datos
 # ============================================================================
 
 url_ts = URL.create(
@@ -111,31 +111,31 @@ def create_all():
 def run_on_dual_dts(logic_func):
     results = []
     
-    # 1. ejecucion Local (principal) -- DISABLED
+    # 1. ejecucion local (principal) -- disabled
     # try:
     #     with next(get_dts_session()) as session:
     #         results.append(logic_func(session))
     # except Exception as e:
-    #     print(f"[DATABASE DUAL] Error en base de datos LOCAL (DTS): {e}")
-    #     # Si la local falla, usualmente queremos que el error suba
+    #     print(f"[error] error en base de datos local (dts): {e}")
+    #     # si la local falla, usualmente queremos que el error suba
     #     raise e
         
-    # 2. ejecucion en AWS RDS (Ahora PRINCIPAL)
+    # 2. ejecucion en aws rds (ahora principal)
     try:
         with next(get_dts_aws_session()) as session:
-            print("[DATABASE INSERT] Iniciando ejecucion en AWS RDS.")
+            print("[info] iniciando ejecucion en aws rds.")
             result = logic_func(session)
             results.append(result)
-            print("[DATABASE INSERT] Ejecucion exitosa en AWS RDS.")
+            print("[ok] ejecucion exitosa en aws rds.")
     except Exception as e:
-        print(f"[DATABASE INSERT] Error en AWS RDS: {e}")
+        print(f"[error] error en aws rds: {e}")
         raise e
         
     return results[0] if results else None
 
 
 # ============================================================================
-# UTILIDADES DE CONVERSION Y NORMALIZACION
+# utilidades de conversion y normalizacion
 # ============================================================================
 
 def to_decimal(value):
@@ -188,7 +188,7 @@ def normalize_date_column(date_series, column_name="FECHA", collector_name="unkn
 
 
 # ============================================================================
-# FUNCIONES DE PERSISTENCIA (CONCILIACIONES, LIQUIDACIONES, RECORDS)
+# funciones de persistencia (conciliaciones, liquidaciones, records)
 # ============================================================================
 
 def insert_conciliations(
@@ -236,7 +236,7 @@ def insert_conciliations(
         return conciliations.id
     except Exception as e:
         session.rollback()
-        raise Exception(f"Error al insertar conciliacion: {e}")
+        raise Exception(f"error al insertar conciliacion: {e}")
 
 
 def insert_conciliation_files(session, conciliation_ids, conciliations_file_types, file_paths):
@@ -253,7 +253,7 @@ def insert_conciliation_files(session, conciliation_ids, conciliations_file_type
         session.commit()
     except Exception as e:
         session.rollback()
-        raise Exception(f"Error al insertar archivo: {e}")
+        raise Exception(f"error al insertar archivo: {e}")
 
 
 def insert_liquidations(
@@ -313,7 +313,7 @@ def insert_liquidations(
         return liquidations.id
     except Exception as e:
         session.rollback()
-        raise Exception(f"Error al insertar liquidacion: {e}")
+        raise Exception(f"error al insertar liquidacion: {e}")
 
 
 def insert_liquidation_files(session, liquidationIds, liquidationsFileTypes, filePaths):
@@ -330,7 +330,7 @@ def insert_liquidation_files(session, liquidationIds, liquidationsFileTypes, fil
         session.commit()
     except Exception as e:
         session.rollback()
-        raise Exception(f"Error al insertar archivo: {e}")
+        raise Exception(f"error al insertar archivo: {e}")
 
 
 def bulk_upsert_collector_records_optimized(session, df, collector_id):
@@ -353,9 +353,9 @@ def bulk_upsert_collector_records_optimized(session, df, collector_id):
             
         df_clean['calimaco_id'] = df_clean['ID CALIMACO'].astype(str)
         df_clean['provider_id'] = df_clean['ID PROVEEDOR'].where(
-            (df_clean['ID PROVEEDOR'].notna()) & (df_clean['ID PROVEEDOR'] != '-'), 'Sin Data'
+            (df_clean['ID PROVEEDOR'].notna()) & (df_clean['ID PROVEEDOR'] != '-'), 'sin data'
         ).astype(str)
-        df_clean['client_name'] = df_clean['CLIENTE'].where(df_clean['CLIENTE'].notna(), 'Sin Data').astype(str)
+        df_clean['client_name'] = df_clean['CLIENTE'].where(df_clean['CLIENTE'].notna(), 'sin data').astype(str)
         df_clean['amount'] = df_clean['MONTO'].apply(to_decimal)
         df_clean['provider_status'] = df_clean['ESTADO PROVEEDOR'].astype(str)
         df_clean['activo'] = True
@@ -406,10 +406,10 @@ def bulk_upsert_calimaco_records_optimized(session, df, collector_id):
         df_valid['collector_id'] = collector_id
         df_valid['calimaco_id'] = df_valid['ID'].astype(str)
         df_valid['status'] = df_valid['Estado'].astype(str)
-        df_valid['user_id'] = df_valid['Usuario'].where(df_valid['Usuario'].notna(), 'Sin Data').astype(str)
+        df_valid['user_id'] = df_valid['Usuario'].where(df_valid['Usuario'].notna(), 'sin data').astype(str)
         df_valid['amount'] = df_valid['Cantidad'].apply(to_decimal)
-        df_valid['external_id'] = df_valid['ID externo'].where(df_valid['ID externo'].notna(), 'Sin Data').astype(str)
-        df_valid['comments'] = df_valid['Comentarios'].where(df_valid['Comentarios'].notna(), 'Sin Comentarios').astype(str)
+        df_valid['external_id'] = df_valid['ID externo'].where(df_valid['ID externo'].notna(), 'sin data').astype(str)
+        df_valid['comments'] = df_valid['Comentarios'].where(df_valid['Comentarios'].notna(), 'sin comentarios').astype(str)
         df_valid['activo'] = True
         
         records = df_valid[['collector_id', 'calimaco_id', 'record_date', 'modification_date', 'status', 'user_id', 'amount', 'external_id', 'comments', 'activo']].to_dict('records')

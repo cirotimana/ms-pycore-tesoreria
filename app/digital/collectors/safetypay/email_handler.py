@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
+﻿from datetime import datetime, timedelta
 import pytz
 import os
 from app.config import Config
-from app.common.mail import sendMailOffice365
+from app.common.mail import send_mail_office_365
 from app.common.s3_utils import *
 
 def send_email_with_results(s3_key, metricas, period):
@@ -18,7 +18,7 @@ def send_email_with_results(s3_key, metricas, period):
     anio_actual = datetime.now(pytz.timezone("America/Lima")).strftime('%Y')
     
     subject = f'Conciliacion Safetypay  {period}'
-    recipients = Config.CORREO_SAFETYPAY.split(',')
+    recipients = Config.EMAIL_SAFETYPAY.split(',')
     mensaje_html = f"""
     <!DOCTYPE html>
     <html>
@@ -102,7 +102,7 @@ def send_email_with_results(s3_key, metricas, period):
                             <td align="center">
                                 <h2 style="color: #856404; margin-top: 0; margin-bottom: 15px;">Descargar Reporte Detallado</h2>
                                 <p style="color: #856404; margin: 0 0 5px 0;"><strong>Archivo:</strong> {filename}</p>
-                                <p style="color: #856404; margin: 0 0 20px 0;"><strong>Tamaño:</strong> {file_size:.2f} MB</p>
+                                <p style="color: #856404; margin: 0 0 20px 0;"><strong>TamaÃ±o:</strong> {file_size:.2f} MB</p>
                                 <div style="margin: 20px 0;">
                                     <a href="{download_link}" 
                                        style="color : #0F6CBD">
@@ -122,7 +122,7 @@ def send_email_with_results(s3_key, metricas, period):
                             <td align="center" style="padding-top: 30px; color: #777; font-size: 0.9em;">
                                 <p>Este reporte fue generado automaticamente - {hora_actual}</p>
                                 <p>En caso de discrepancias, revisar el sistema recaudador.</p>
-                                <p style="margin: 10px 0 0; font-size: 12px; color: #666;">Prevencion de Fraude - Optimizacion Operativa<br>© {anio_actual}</p>
+                                <p style="margin: 10px 0 0; font-size: 12px; color: #666;">Prevencion de Fraude - Optimizacion Operativa<br>Â© {anio_actual}</p>
                             </td>
                         </tr>
                     </table>
@@ -133,7 +133,7 @@ def send_email_with_results(s3_key, metricas, period):
     </html>
     """
     # enviar correo con adjunto en memoria
-    sendMailOffice365(Config.SMTP_USER, subject, mensaje_html, recipients, None)
+    send_mail_office_365(Config.SMTP_USER, subject, mensaje_html, recipients, None)
 
 
 def send_email_with_results_month(s3_key, metricas, period):
@@ -149,7 +149,7 @@ def send_email_with_results_month(s3_key, metricas, period):
     anio_actual = datetime.now(pytz.timezone("America/Lima")).strftime('%Y')
 
     subject = f'Conciliacion Safetypay para el periodo {period}'
-    recipients = Config.CORREO_SAFETYPAY.split(',')
+    recipients = Config.EMAIL_SAFETYPAY.split(',')
     mensaje_html = f"""
     <!DOCTYPE html>
     <html>
@@ -233,7 +233,7 @@ def send_email_with_results_month(s3_key, metricas, period):
                             <td align="center">
                                 <h2 style="color: #856404; margin-top: 0; margin-bottom: 15px;">Descargar Reporte Detallado</h2>
                                 <p style="color: #856404; margin: 0 0 5px 0;"><strong>Archivo:</strong> {filename}</p>
-                                <p style="color: #856404; margin: 0 0 20px 0;"><strong>Tamaño:</strong> {file_size:.2f} MB</p>
+                                <p style="color: #856404; margin: 0 0 20px 0;"><strong>TamaÃ±o:</strong> {file_size:.2f} MB</p>
                                 <div style="margin: 20px 0;">
                                     <a href="{download_link}" 
                                        style="color : #0F6CBD">
@@ -253,7 +253,7 @@ def send_email_with_results_month(s3_key, metricas, period):
                             <td align="center" style="padding-top: 30px; color: #777; font-size: 0.9em;">
                                 <p>Este reporte fue generado automaticamente - {hora_actual}</p>
                                 <p>En caso de discrepancias, revisar el sistema recaudador.</p>
-                                <p style="margin: 10px 0 0; font-size: 12px; color: #666;">Prevencion de Fraude - Optimizacion Operativa<br>© {anio_actual}</p>
+                                <p style="margin: 10px 0 0; font-size: 12px; color: #666;">Prevencion de Fraude - Optimizacion Operativa<br>Â© {anio_actual}</p>
                             </td>
                         </tr>
                     </table>
@@ -265,7 +265,7 @@ def send_email_with_results_month(s3_key, metricas, period):
     """
 
     # enviar correo con adjunto en memoria
-    sendMailOffice365(Config.SMTP_USER, subject, mensaje_html, recipients, None)
+    send_mail_office_365(Config.SMTP_USER, subject, mensaje_html, recipients, None)
     
     
 if __name__ == "__main__":
@@ -287,3 +287,4 @@ if __name__ == "__main__":
     period = "2025-08-21"
 
     send_email_with_results(s3_key, metricas, period)
+

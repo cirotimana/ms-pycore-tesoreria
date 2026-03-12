@@ -15,12 +15,12 @@ def get_main_kashio(from_date = None, to_date = None):
         from_date = datetime.strptime(from_date, fmt).replace(tzinfo=lima_tz)
         to_date = datetime.strptime(to_date, fmt).replace(tzinfo=lima_tz)
         
-    print(f"[DEBUG] Enviando fechas from_date : {from_date} , to_date : {to_date}")
+    print(f"[debug] enviando fechas from_date : {from_date} , to_date : {to_date}")
 
     # validar rango maximo de 10 dias (conteo inclusivo)
     valid, from_date, to_date = validate_date_range(from_date, to_date)
     if not valid:
-        return {"success": False, "message": "rango o formato invalido"}
+        return {"success": False, "message": "Rango o Formato invalido"}
 
     start_time = time.time()
     try:       
@@ -40,10 +40,10 @@ def get_main_kashio(from_date = None, to_date = None):
         elapsed_time = time.time() - start_time
     
         if all_success:
-            print(f"todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos")
+            print(f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos")
             return {
                 "success": True,
-                "message": f"todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos",
+                "message": f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos",
                 "failed_operations": []
             }
         else:
@@ -99,10 +99,10 @@ def get_updated_kashio():
         elapsed_time = time.time() - start_time
     
         if all_success:
-            print(f"todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos")
+            print(f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos")
             return {
                 "success": True,
-                "message": f"todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos",
+                "message": f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos",
                 "failed_operations": []
             }
         else:

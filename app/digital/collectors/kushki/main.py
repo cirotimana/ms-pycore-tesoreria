@@ -21,7 +21,7 @@ def get_main_kushki(from_date=None, to_date=None):
 
     valid, from_date, to_date = validate_date_range(from_date, to_date)
     if not valid:
-        return {"success": False, "message": "rango o formato invalido"}
+        return {"success": False, "message": "Rango o Formato invalido"}
 
     print(f"[debug] enviando fechas from_date: {from_date}, to_date: {to_date}")
 
@@ -50,10 +50,10 @@ def get_main_kushki(from_date=None, to_date=None):
         all_success = all(results.values())
 
         if all_success:
-            print(f"[ok] todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos")
+            print(f"[ok] Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos")
             return {
                 "success": True,
-                "message": f"todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos",
+                "message": f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos",
                 "failed_operations": []
             }
         else:
@@ -116,10 +116,10 @@ def get_updated_kushki():
         all_success = all(results.values())
 
         if all_success:
-            print(f"[ok] todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos")
+            print(f"[ok] Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos")
             return {
                 "success": True,
-                "message": f"todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos",
+                "message": f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos",
                 "failed_operations": []
             }
         else:

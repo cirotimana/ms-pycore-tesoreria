@@ -22,17 +22,17 @@ def save_secret(label, secret):
     secrets[label] = secret
     with open(SECRET_FILE, "w") as f:
         json.dump(secrets, f, indent=2)
-    print(f"[✔] Clave guardada en: {SECRET_FILE}")
+    print(f"[ok] Clave guardada en: {SECRET_FILE}")
 
 def load_secret(label):
     if not SECRET_FILE.exists():
-        print(f"[!] No se encontro el archivo: {SECRET_FILE}")
+        print(f"[alerta] No se encontro el archivo: {SECRET_FILE}")
         return None
     with open(SECRET_FILE, "r") as f:
         secrets = json.load(f)
     secret = secrets.get(label)
     if secret:
-        print(f"[✔] Clave recuperada para '{label}' desde: {SECRET_FILE}")
+        print(f"[ok] Clave recuperada para '{label}' desde: {SECRET_FILE}")
     else:
-        print(f"[!] No se encontro la clave para '{label}' en: {SECRET_FILE}")
+        print(f"[alerta] No se encontro la clave para '{label}' en: {SECRET_FILE}")
     return secret

@@ -19,7 +19,7 @@ def ensure_output_dir(output_dir):
     return output_dir
 
 def convert_row_to_json_safe_dict_exclude(row, exclude_fields=None):
-    """Convierte una fila de DataFrame a un diccionario seguro para JSON, omitiendo columnas indicadas"""
+    """convierte una fila de dataframe a un diccionario seguro para json, omitiendo columnas indicadas"""
     if exclude_fields is None:
         exclude_fields = []
     row_dict = row.to_dict()

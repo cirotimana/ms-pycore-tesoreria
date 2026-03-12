@@ -13,7 +13,7 @@ def get_data_safetypay(from_date, to_date):
     try:
         get_data_main(from_date, to_date)
     except Exception as e:
-        print(f"[ALERTA] Error ejecutando la descarga de safetypay: {e}")
+        print(f"[warn] error ejecutando la descarga de safetypay: {e}")
         return False
     
     try:
@@ -41,7 +41,7 @@ def get_data_safetypay(from_date, to_date):
                         delete_file_from_s3(s3_key)
                     
                 except Exception as e:
-                    print(f"[✖] Error al procesar {s3_key}: {e}")
+                    print(f"[error] error al procesar {s3_key}: {e}")
 
         if dataframes:
             consolidated_df = pd.concat(dataframes, ignore_index=True)
@@ -58,15 +58,15 @@ def get_data_safetypay(from_date, to_date):
                 upload_file_to_s3(buffer.getvalue(), output_key)
             #download_file_from_s3_to_local(file_key)(output_key)
             
-            print(f"[SUCCESS] Safetypay procesado exitosamente: {output_key}")
+            print(f"[ok] safetypay procesado exitosamente: {output_key}")
             return True 
       
         else:
-            print("[✖] No se encontraron archivos Excel para consolidar.")
+            print("[error] no se encontraron archivos excel para consolidar")
             return False
-
+        
     except Exception as e:
-        print(f"[✖] Error procesando datos Safetypay: {e}")
+        print(f"[error] error procesando datos safetypay: {e}")
         return False
         
 def get_data_calimaco(from_date, to_date):
@@ -96,11 +96,11 @@ def get_data_calimaco(from_date, to_date):
         #download_file_from_s3_to_local(file_key)(output_key)
         delete_file_from_s3(calimaco_key)
         
-        print(f"[SUCCESS] Calimaco procesado exitosamente: {output_key}")
+        print(f"[ok] calimaco procesado exitosamente: {output_key}")
         return True
 
     except Exception as e:
-        print(f"[✖] Error en get_data_calimaco: {e}")
+        print(f"[error] error en get_data_calimaco: {e}")
         return False
         
 def conciliation_data(from_date, to_date):
@@ -114,11 +114,12 @@ def conciliation_data(from_date, to_date):
         safetypay_key = get_latest_file_from_s3(safetypay_prefix)
 
         if not calimaco_key or not safetypay_key:
-            print("[ALERTA] No se encontraron archivos para conciliar")
+            print("[warn] no se encontraron archivos para conciliar")
             return False
 
-        print(f"[INFO] Procesando archivo Calimaco: {calimaco_key}")
-        print(f"[INFO] Procesando archivo Safetypay: {safetypay_key}")
+        print(f"[info] procesando archivo calimaco: {calimaco_key}")
+        print(f"[info] procesando archivo safetypay: {safetypay_key}")
+        
 
         # leer archivos directamente desde S3
         calimaco_content = read_file_from_s3(calimaco_key)
@@ -329,12 +330,12 @@ def conciliation_data(from_date, to_date):
 
         run_on_dual_dts(final_save)
                 
-        print(f"[SUCCESS] Conciliacion completada exitosamente: {output_key}")
+        print(f"[ok] conciliacion completada exitosamente: {output_key}")
         return True
         
         
     except Exception as e:
-        print(f"[✖] Error en conciliation_data para safetypay: {e}")
+        print(f"[error] error en conciliation_data para safetypay: {e}")
         return False
         
         
@@ -348,11 +349,11 @@ def updated_data_safetypay():
         safetypay_key = get_latest_file_from_s3(safetypay_prefix)
 
         if not calimaco_key or not safetypay_key:
-            print("[ALERTA] No se encontraron archivos para actualizar")
+            print("[warn] no se encontraron archivos para actualizar")
             return False
 
-        print(f"[INFO] Procesando archivo Calimaco: {calimaco_key}")
-        print(f"[INFO] Procesando archivo Safetypay: {safetypay_key}")
+        print(f"[info] procesando archivo calimaco: {calimaco_key}")
+        print(f"[info] procesando archivo safetypay: {safetypay_key}")
 
         # leer archivos directamente desde S3
         calimaco_content = read_file_from_s3(calimaco_key)
@@ -388,11 +389,11 @@ def updated_data_safetypay():
         delete_file_from_s3(safetypay_key)
         delete_file_from_s3(calimaco_key)
         
-        print(f"[SUCCESS] Proceso exitoso para la actualizacion de safetypay")
+        print(f"[ok] proceso exitoso para la actualizacion de safetypay")
         return True
   
     except Exception as e:
-        print(f"[ERROR] Error en updated_data_safetypay: {e}")
+        print(f"[error] error en updated_data_safetypay: {e}")
         return False
     
     

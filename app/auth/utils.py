@@ -46,10 +46,10 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
 
 
 def decode_access_token(token: str) -> Optional[TokenData]:
-    print(f"[DEBUG] ====== INICIANDO DECODIFICACION DE TOKEN ======")
-    print(f"[DEBUG] Token recibido (primeros 50 chars): {token[:50]}")
-    print(f"[DEBUG] SECRET_KEY: {Config.JWT_SECRET_KEY}")
-    print(f"[DEBUG] Algoritmo: {Config.JWT_ALGORITHM}")
+    print(f"[debug] ====== iniciando decodificacion de token ======")
+    print(f"[debug] token recibido (primeros 50 chars): {token[:50]}")
+    print(f"[debug] secret_key: {Config.JWT_SECRET_KEY}")
+    print(f"[debug] algoritmo: {Config.JWT_ALGORITHM}")
     
     try:
         payload = jwt.decode(
@@ -59,9 +59,9 @@ def decode_access_token(token: str) -> Optional[TokenData]:
             options={"verify_sub": False}  # Desactivar validación de 'sub' si no se envía
         )
 
-        print(f"[DEBUG] ✓ Token decodificado exitosamente")
-        print(f"[DEBUG] Payload COMPLETO: {payload}")
-        print(f"[DEBUG] Claves en el payload: {list(payload.keys())}")
+        print(f"[ok] token decodificado exitosamente")
+        print(f"[debug] payload completo: {payload}")
+        print(f"[debug] claves en el payload: {list(payload.keys())}")
 
         # PyJWT normaliza 'user_id' a 'sub' automáticamente
         # Intentar obtener del claim 'sub' primero (normalizado), luego de 'user_id'
@@ -69,26 +69,26 @@ def decode_access_token(token: str) -> Optional[TokenData]:
         username: str = payload.get("username")
         email: str = payload.get("email")
 
-        print(f"[DEBUG] Valores extraídos -> user_id={user_id}, username={username}, email={email}")
+        print(f"[debug] valores extraidos -> user_id={user_id}, username={username}, email={email}")
 
         if user_id is None:
-            print("[WARN] ⚠ user_id es None en el payload del token")
+            print("[warn] user_id es none en el payload del token")
             return None
 
-        print(f"[DEBUG] ✓ Token válido para user_id={user_id}")
+        print(f"[debug] token valido para user_id={user_id}")
         return TokenData(user_id=user_id, username=username, email=email)
 
     except jwt.ExpiredSignatureError as e:
-        print(f"[ERROR] ✗ Token ha expirado: {e}")
+        print(f"[error] token ha expirado: {e}")
         return None
     except jwt.DecodeError as e:
-        print(f"[ERROR] ✗ Error decodificando token: {e}")
+        print(f"[error] error decodificando token: {e}")
         return None
     except jwt.InvalidSignatureError as e:
-        print(f"[ERROR] ✗ Firma de token inválida: {e}")
+        print(f"[error] firma de token invalida: {e}")
         return None
     except Exception as e:
-        print(f"[ERROR] ✗ Error inesperado decodificando token: {type(e).__name__}: {e}")
+        print(f"[error] error inesperado decodificando token: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
         return None

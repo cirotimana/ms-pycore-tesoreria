@@ -7,7 +7,7 @@ from app.digital.collectors.nuvei.analysis import get_data_nuvei, get_data_calim
 from app.common.utils import validate_date_range
 
 
-def get_main_nuvei(from_date=None, to_date=None):
+async def get_main_nuvei(from_date=None, to_date=None):
     # funcion principal que coordina la descarga y conciliacion de nuvei
     lima_tz = pytz.timezone("America/Lima")
     now = datetime.now(lima_tz)
@@ -22,22 +22,29 @@ def get_main_nuvei(from_date=None, to_date=None):
 
     valid, from_date, to_date = validate_date_range(from_date, to_date)
     if not valid:
-        return {"success": False, "message": "rango o formato invalido"}
+        return {"success": False, "message": "Rango o Formato invalido"}
 
     print(f"[debug] enviando fechas from_date: {from_date}, to_date: {to_date}")
 
     start_time = time.time()
     try:
-        # ejecutar descarga de nuvei y calimaco en paralelo
+        # ejecutar descarga de nuvei y calimaco en paralelo con asyncio.gather
         print("[info] iniciando descargas de nuvei y calimaco en paralelo...")
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            future_nuvei = executor.submit(asyncio.run, get_data_nuvei(from_date, to_date))
-            future_calimaco = executor.submit(asyncio.run, get_data_calimaco(from_date, to_date))
+        
+        # nuvei y calimaco son async, los ejecutamos concurrentemente
+        results_list = await asyncio.gather(
+            get_data_nuvei(from_date, to_date),
+            get_data_calimaco(from_date, to_date),
+            return_exceptions=True
+        )
 
-            results = {
-                'nuvei': future_nuvei.result(),
-                'calimaco': future_calimaco.result()
-            }
+        results = {
+            'nuvei': results_list[0] if not isinstance(results_list[0], Exception) else False,
+            'calimaco': results_list[1] if not isinstance(results_list[1], Exception) else False
+        }
+        
+        if isinstance(results_list[0], Exception): print(f"[error] excepcion en nuvei: {results_list[0]}")
+        if isinstance(results_list[1], Exception): print(f"[error] excepcion en calimaco: {results_list[1]}")
 
         if results['nuvei'] and results['calimaco']:
             results['conciliation'] = conciliation_data(from_date, to_date)
@@ -50,10 +57,10 @@ def get_main_nuvei(from_date=None, to_date=None):
         all_success = all(results.values())
 
         if all_success:
-            print(f"[ok] todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos")
+            print(f"[ok] Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos")
             return {
                 "success": True,
-                "message": f"todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos",
+                "message": f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos",
                 "failed_operations": []
             }
         else:
@@ -85,7 +92,7 @@ def get_main_nuvei(from_date=None, to_date=None):
         }
 
 
-def get_updated_nuvei():
+async def get_updated_nuvei():
     # funcion para actualizar datos del dia actual de nuvei y calimaco en paralelo
     lima_tz = pytz.timezone("America/Lima")
     now = datetime.now(lima_tz)
@@ -94,16 +101,23 @@ def get_updated_nuvei():
 
     start_time = time.time()
     try:
-        # ejecutar actualizacion de nuvei y calimaco en paralelo
+        # ejecutar actualizacion de nuvei y calimaco en paralelo con asyncio.gather
         print("[info] iniciando actualizaciones de nuvei y calimaco en paralelo...")
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            future_nuvei = executor.submit(asyncio.run, get_data_nuvei(now, now))
-            future_calimaco = executor.submit(asyncio.run, get_data_calimaco(now, now))
+        
+        # nuvei y calimaco son async
+        results_list = await asyncio.gather(
+            get_data_nuvei(now, now),
+            get_data_calimaco(now, now),
+            return_exceptions=True
+        )
 
-            results = {
-                'nuvei': future_nuvei.result(),
-                'calimaco': future_calimaco.result()
-            }
+        results = {
+            'nuvei': results_list[0] if not isinstance(results_list[0], Exception) else False,
+            'calimaco': results_list[1] if not isinstance(results_list[1], Exception) else False
+        }
+        
+        if isinstance(results_list[0], Exception): print(f"[error] excepcion en nuvei: {results_list[0]}")
+        if isinstance(results_list[1], Exception): print(f"[error] excepcion en calimaco: {results_list[1]}")
 
         if results['nuvei'] and results['calimaco']:
             results['updated'] = updated_data_nuvei()
@@ -116,10 +130,10 @@ def get_updated_nuvei():
         all_success = all(results.values())
 
         if all_success:
-            print(f"[ok] todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos")
+            print(f"[ok] Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos")
             return {
                 "success": True,
-                "message": f"todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos",
+                "message": f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos",
                 "failed_operations": []
             }
         else:
@@ -152,4 +166,4 @@ def get_updated_nuvei():
 
 
 if __name__ == "__main__":
-    get_main_nuvei('01032026', '10032026')
+    asyncio.run(get_main_nuvei('01032026', '10032026'))

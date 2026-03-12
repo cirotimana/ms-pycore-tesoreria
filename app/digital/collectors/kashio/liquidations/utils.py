@@ -48,10 +48,10 @@ async def get_public_id_async(token, from_date, to_date):
             
             return public_ids, reference
         else:
-            print(f"[✖] Error {response.status_code}: {response.text}")
+            print(f"[error] Error {response.status_code}: {response.text}")
             return []
     except Exception as e:
-        print(f"[✖] Excepcion durante la llamada en kashio: {e}")
+        print(f"[error] Excepcion durante la llamada en kashio: {e}")
         return []
 
 async def export_settlement_to_s3_async(token, public_id, reference):
@@ -74,7 +74,7 @@ async def export_settlement_to_s3_async(token, public_id, reference):
             storage_url = export_data.get("storage_url")
 
             if not storage_url:
-                print(f"[✖] No se recibio storage_url en la respuesta: {export_data}")
+                print(f"[error] No se recibio storage_url en la respuesta: {export_data}")
                 return None
 
             file_resp = requests.get(storage_url, timeout=500)
@@ -87,14 +87,14 @@ async def export_settlement_to_s3_async(token, public_id, reference):
                     upload_file_to_s3(excel_buffer.getvalue(), output_key)
                 return output_key
             else:
-                print(f"[✖] Error al descargar archivo real: {file_resp.status_code}")
+                print(f"[error] Error al descargar archivo real: {file_resp.status_code}")
                 return None
         else:
-            print(f"[✖] Error al exportar {public_id}: {response.status_code} - {response.text}")
+            print(f"[error] Error al exportar {public_id}: {response.status_code} - {response.text}")
             return None
 
     except Exception as e:
-        print(f"[✖] Excepción al exportar {public_id}: {e}")
+        print(f"[error] Excepción al exportar {public_id}: {e}")
         return None
 
 async def get_data_liq_async(from_date, to_date):
@@ -257,7 +257,7 @@ def get_data_kashio(from_date, to_date):
                         delete_file_from_s3(s3_key)
                     
                 except Exception as e:
-                    print(f"[✖] Error al procesar {s3_key}: {e}")
+                    print(f"[error] Error al procesar {s3_key}: {e}")
 
         if dataframes:
             consolidated_df = pd.concat(dataframes, ignore_index=True)
@@ -291,7 +291,7 @@ def get_data_kashio(from_date, to_date):
             return False
 
     except Exception as e:
-        print(f"[✖] Error procesando datos Kashio: {e}")
+        print(f"[error] Error procesando datos Kashio: {e}")
         return False
         
 

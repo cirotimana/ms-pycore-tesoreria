@@ -19,7 +19,7 @@ def get_main_yape(from_date = None, to_date = None):
         
     valid, from_date, to_date = validate_date_range(from_date, to_date)
     if not valid:
-        return {"success": False, "message": "rango o formato invalido"}
+        return {"success": False, "message": "Rango o Formato invalido"}
     
     start_time = time.time()
     print(f"[debug] enviando fechas from_date : {from_date.date()} , to_date : {to_date.date()}")
@@ -45,10 +45,10 @@ def get_main_yape(from_date = None, to_date = None):
         elapsed_time = time.time() - start_time
     
         if all_success:
-            print(f"[ok] todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos")
+            print(f"[ok] Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos")
             return {
                 "success": True,
-                "message": f"todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos",
+                "message": f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos",
                 "failed_operations": []
             }
         else:
@@ -63,7 +63,7 @@ def get_main_yape(from_date = None, to_date = None):
             print(f"[warn] operaciones fallidas despues de {elapsed_time:.2f} segundos: {failed_operations}")
             return {
                 "success": False,
-                "message": f"algunas operaciones fallaron en {elapsed_time:.2f} segundos",
+                "message": f"Algunas operaciones fallaron en {elapsed_time / 60:.2f} minutos",
                 "failed_operations": failed_operations,
                 "successful_operations": [op for op, success in results.items() if success]
             }
@@ -108,10 +108,10 @@ def get_updated_yape():
         elapsed_time = time.time() - start_time
     
         if all_success:
-            print(f"[ok] todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos")
+            print(f"[ok] Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos")
             return {
                 "success": True,
-                "message": f"todas las operaciones completadas exitosamente en {elapsed_time:.2f} segundos",
+                "message": f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos",
                 "failed_operations": []
             }
         else:
@@ -126,7 +126,7 @@ def get_updated_yape():
             print(f"[warn] operaciones fallidas despues de {elapsed_time:.2f} segundos: {failed_operations}")
             return  {
                 "success": False,
-                "message": f"algunas operaciones fallaron en {elapsed_time:.2f} segundos",
+                "message": f"Algunas operaciones fallaron en {elapsed_time / 60:.2f} minutos",
                 "failed_operations": failed_operations,
                 "successful_operations": [op for op, success in results.items() if success]
             }

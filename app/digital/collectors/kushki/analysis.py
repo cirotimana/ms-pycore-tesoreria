@@ -17,7 +17,7 @@ def get_data_kushki(from_date, to_date):
     try:
         get_data_main(from_date, to_date)
     except Exception as e:
-        print(f"[ALERTA] Error ejecutando la descarga de kushki: {e}")
+        print(f"[warn] error ejecutando la descarga de kushki: {e}")
         return False
     try:
         s3_prefix = "digital/collectors/kushki/input/"
@@ -44,7 +44,7 @@ def get_data_kushki(from_date, to_date):
                         delete_file_from_s3(s3_key)
                     
                 except Exception as e:
-                    print(f"[✖] Error al procesar {s3_key}: {e}")
+                    print(f"[error] error al procesar {s3_key}: {e}")
 
         if dataframes:
             consolidated_df = pd.concat(dataframes, ignore_index=True)
@@ -59,15 +59,15 @@ def get_data_kushki(from_date, to_date):
                 upload_file_to_s3(buffer.getvalue(), output_key)
                 
             ###download_file_from_s3_to_local(output_key)##para pruebitas lo guardo en local
-            print(f"[SUCCESS] Kushki procesado exitosamente: {output_key}")
+            print(f"[ok] kushki procesado exitosamente: {output_key}")
             return True
         
         else:
-            print("[✖] No se encontraron archivos Excel para consolidar.")
+            print("[error] no se encontraron archivos excel para consolidar.")
             return False
 
     except Exception as e:
-        print(f"[✖] Error procesando datos kushki: {e}")
+        print(f"[error] error procesando datos kushki: {e}")
 
 
 def get_data_calimaco(from_date, to_date):
@@ -96,11 +96,11 @@ def get_data_calimaco(from_date, to_date):
         delete_file_from_s3(calimaco_key)
         
         ###download_file_from_s3_to_local(output_key)##para pruebitas lo guardo en local
-        print(f"[SUCCESS] Calimaco procesado exitosamente: {output_key}")
+        print(f"[ok] calimaco procesado exitosamente: {output_key}")
         return True 
     
     except Exception as e:
-        print(f"[✖] Error en get_data_calimaco: {e}")
+        print(f"[error] error en get_data_calimaco: {e}")
         return False
 
 def conciliation_data(from_date, to_date):
@@ -115,11 +115,11 @@ def conciliation_data(from_date, to_date):
         kushki_key = get_latest_file_from_s3(kushki_prefix)
 
         if not calimaco_key or not kushki_key:
-            print("[ALERTA] No se encontraron archivos para conciliar")
+            print("[warn] no se encontraron archivos para conciliar")
             return False
 
-        print(f"[INFO] Procesando archivo Calimaco: {calimaco_key}")
-        print(f"[INFO] Procesando archivo Kushki: {kushki_key}")
+        print(f"[info] procesando archivo calimaco: {calimaco_key}")
+        print(f"[info] procesando archivo kushki: {kushki_key}")
 
         # leer archivos directamente desde S3
         calimaco_content = read_file_from_s3(calimaco_key)
@@ -267,7 +267,7 @@ def conciliation_data(from_date, to_date):
             
         }
         
-        print("Datos obtenidos:")
+        print("datos obtenidos:")
         for k, v in metricas.items():
             print(f"- {k}: {v}")
         
@@ -291,9 +291,9 @@ def conciliation_data(from_date, to_date):
         )
         delete_file_from_s3(calimaco_key)
                 
-        # Enviar correo
-        print("[INFO] enviando correo con resultados")
-        period_email = f"{from_date.strftime("%Y/%m/%d")} - {to_date.strftime("%Y/%m/%d")}"
+        # enviar correo
+        print("[info] enviando correo con resultados")
+        period_email = f"{from_date.strftime('%Y/%m/%d')} - {to_date.strftime('%Y/%m/%d')}"
         send_email_with_results(output_key, metricas, period_email)
         
         # convierte ambas a date (YYYY-MM-DD)
@@ -330,11 +330,11 @@ def conciliation_data(from_date, to_date):
 
         run_on_dual_dts(final_save)
                 
-        print(f"[SUCCESS] Conciliacion completada exitosamente: {output_key}")
+        print(f"[ok] conciliacion completada exitosamente: {output_key}")
         return True 
             
     except Exception as e:
-        print(f"[✖] Error en conciliation_data para kushki: {e}")
+        print(f"[error] error en conciliation_data para kushki: {e}")
         return False
 
 
@@ -349,11 +349,11 @@ def updated_data_kushki():
         kushki_key = get_latest_file_from_s3(kushki_prefix)
 
         if not calimaco_key or not kushki_key:
-            print("[ALERTA] No se encontraron archivos para actualizar")
+            print("[warn] no se encontraron archivos para actualizar")
             return False
 
-        print(f"[INFO] Procesando archivo Calimaco: {calimaco_key}")
-        print(f"[INFO] Procesando archivo Kushki: {kushki_key}")
+        print(f"[info] procesando archivo calimaco: {calimaco_key}")
+        print(f"[info] procesando archivo kushki: {kushki_key}")
 
         # leer archivos directamente desde S3
         calimaco_content = read_file_from_s3(calimaco_key)
@@ -389,11 +389,11 @@ def updated_data_kushki():
         delete_file_from_s3(kushki_key)
         delete_file_from_s3(calimaco_key)
         
-        print("[SUCCESS] Proceso de actualizacion para kushki exitoso")
+        print("[ok] proceso de actualizacion para kushki exitoso")
         return True
   
     except Exception as e:
-        print(f"[ERROR] Error en updated_data_kushki: {e}")
+        print(f"[error] error en updated_data_kushki: {e}")
         return False
     
     
