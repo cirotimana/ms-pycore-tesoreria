@@ -449,8 +449,32 @@ async def get_download_data_yape_async(token, from_date, to_date):
     return id_list, current_token
 
 
+async def delete_yape_report_async(token, download_id, user_id="68acfb6c8029a31646a25391"):
+    url = "https://api.niubizenlinea.com.pe/ms-download/api/downloads/user"
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+        "Authorization": token,
+        "Origin": "https://www.niubizenlinea.com.pe",
+        "Referer": "https://www.niubizenlinea.com.pe/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+    }
+    payload = {"downloadId": download_id, "userId": user_id}
+    try:
+        response = requests.delete(url, headers=headers, json=payload, timeout=60)
+        if response.status_code == 200:
+            print(f"[SUCCESS] Reporte {download_id} eliminado de la bandeja")
+            return True
+        else:
+            print(f"[WARN] No se pudo eliminar el reporte {download_id}: {response.text}")
+            return False
+    except Exception as e:
+        print(f"[ERROR] Error al eliminar reporte {download_id}: {e}")
+        return False
+
+
 # paso 3: verificar estado de los reportes
-async def check_download_status_async(token, user_id="68acfb6c8029a31646a25391"):
+async def check_download_status_async(token, id_list=None, user_id="68acfb6c8029a31646a25391"):
     headers = {
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json",
@@ -474,17 +498,25 @@ async def check_download_status_async(token, user_id="68acfb6c8029a31646a25391")
             data = response.json()
             
             if "downloadsList" in data:
-                completed_downloads = []
+                all_status = []
                 for download in data["downloadsList"]:
-                    if download.get("downloadStatus", {}).get("description") == "Terminado":
-                        completed_downloads.append({
-                            "id": download["_id"],
-                            "filename": download["filename"],
-                            "status": download["downloadStatus"]["description"]
-                        })
-                        print(f"[INFO] Archivo listo: {download['_id']} - {download['filename']}")
+                    d_id = download["_id"]
+                    d_status = download.get("downloadStatus", {}).get("description", "Desconocido")
+                    
+                    # Solo loguear si está en la lista solicitada
+                    if id_list and d_id in id_list:
+                        if d_status == "Terminado":
+                            print(f"[INFO] Archivo listo: {d_id} - {download['filename']}")
+                        elif d_status == "Error":
+                            print(f"[ERROR] Reporte fallido en Niubiz: {d_id}")
+                    
+                    all_status.append({
+                        "id": d_id,
+                        "filename": download["filename"],
+                        "status": d_status
+                    })
                 
-                return completed_downloads
+                return all_status
             else:
                 print("[WARN] No se encontro 'downloadsList' en la respuesta")
                 return []
@@ -563,15 +595,14 @@ async def download_files_async(token, download_ids):
                     extracted_files = process_zip_file_yape(content, current_time)
                     downloaded_files.extend(extracted_files)
                 else:
-                    # Si no es ZIP, guardar directamente
                     output_key = f"digital/collectors/yape/input/{filename.replace('.zip', '')}_{current_time}"
-                    
                     with BytesIO(content) as buffer:
                         upload_file_to_s3(buffer.getvalue(), output_key)
-                    
-                    # download_file_from_s3_to_local(output_key)  # Comentado para optimizar
                     downloaded_files.append(output_key)
                     print(f"[SUCCESS] Archivo guardado: {output_key}")
+                
+                # ELIMINAR DE BANDEJA TRAS DESCARGA
+                await delete_yape_report_async(token, download_id)
                 
             else:
                 print(f"[ERROR] Error {response.status_code} descargando {download_id}: {response.text}")
@@ -601,17 +632,19 @@ async def get_yape_reports_async(token, from_date, to_date, max_wait_minutes=15)
     for attempt in range(max_attempts):
         print(f"[INFO] Verificando estado (intento {attempt + 1}/{max_attempts})")
         
-        completed_downloads = await check_download_status_async(updated_token)
+        all_downloads = await check_download_status_async(updated_token, id_list=id_list)
         
         # Filtrar solo los IDs que solicitamos
-        ready_downloads = [d for d in completed_downloads if d["id"] in id_list]
+        ready_downloads = [d for d in all_downloads if d["id"] in id_list and d["status"] == "Terminado"]
+        failed_downloads = [d for d in all_downloads if d["id"] in id_list and d["status"] == "Error"]
         
+        if failed_downloads:
+            print(f"[ERROR] Abortando espera: {len(failed_downloads)} reportes fallaron en Niubiz")
+            break
+
         if len(ready_downloads) == len(id_list):
             print(f"[SUCCESS] Todos los reportes están listos ({len(ready_downloads)})")
-            
-            # Paso 3: Descargar archivos
-            downloaded_files = await download_files_async(updated_token, ready_downloads)
-            return downloaded_files
+            break
         
         elif ready_downloads:
             print(f"[INFO] {len(ready_downloads)}/{len(id_list)} reportes listos")
@@ -620,14 +653,13 @@ async def get_yape_reports_async(token, from_date, to_date, max_wait_minutes=15)
             print("[INFO] Esperando 30 segundos antes del siguiente chequeo...")
             await asyncio.sleep(30)
     
-    print(f"[WARN] Timeout después de {max_wait_minutes} minutos")
-    
-    # Descargar los que estén listos
+    # Paso 3: Descargar archivos (los que estén listos)
     if ready_downloads:
         print(f"[INFO] Descargando {len(ready_downloads)} archivos disponibles")
         downloaded_files = await download_files_async(updated_token, ready_downloads)
         return downloaded_files
     
+    print("[WARN] No se descargaron archivos.")
     return []
 
 
