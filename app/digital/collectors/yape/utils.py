@@ -583,7 +583,7 @@ async def download_files_async(token, download_ids):
 
 
 # funcion que combina todo el proceso
-async def get_yape_reports_async(token, from_date, to_date, max_wait_minutes=30):
+async def get_yape_reports_async(token, from_date, to_date, max_wait_minutes=15):
     print("[INFO] Iniciando proceso completo de descarga de reportes Yape")
     
     # Paso 1: Solicitar reportes
@@ -1064,10 +1064,3 @@ def json_excel_yape():
     return processed_files 
 
 
-
-if __name__ == "__main__":
-    lima_tz = pytz.timezone("America/Lima")
-    now = datetime.now(lima_tz)
-    print(f"[DEBUG] Enviando fechas from_date : {now} , to_date : {now}")
-    result = get_data_main_json(now, now)
-    print(f"[DEBUG] Resultados finales: {result}")

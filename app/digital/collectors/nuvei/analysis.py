@@ -13,7 +13,6 @@ from app.digital.collectors.calimaco.main import *
 import pytz
 
 async def get_data_nuvei(from_date, to_date):
-    s3_client = get_s3_client_with_role()
     try:
         s3_files = await get_main_download(from_date, to_date)
         if s3_files:

@@ -8,7 +8,6 @@ from app.common.s3_utils import *
 from app.digital.collectors.calimaco.main import *
 
 def get_data_tupay(from_date, to_date):
-    s3_client = get_s3_client_with_role()
     try:
         get_data_main(from_date, to_date)
     except Exception as e:
