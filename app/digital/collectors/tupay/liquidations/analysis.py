@@ -36,8 +36,6 @@ def get_tupay_liq(from_date, to_date):
         return False
         
     try:
-
-        s3_client = get_s3_client_with_role()
         
         tupay_prefix = "digital/collectors/tupay/liquidations/Tupay_Aprobados_"
         liquidations_prefix = "digital/collectors/tupay/liquidations/Tupay_Liquidaciones_"
@@ -186,22 +184,13 @@ def get_tupay_liq(from_date, to_date):
                 except Exception as e:
                     print(f"[ALERTA] No se pudo eliminar archivo temporal {ult}: {e}")
 
-        # Mover archivos originales a processed
         new_tupay_key = tupay_key.replace('/liquidations/', '/liquidations/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': tupay_key},
-            Key=new_tupay_key
-        )
-        delete_file_from_s3(tupay_key)
+        if copy_file_in_s3(tupay_key, new_tupay_key):
+            delete_file_from_s3(tupay_key)
         
         new_liquidations_key = liquidations_key.replace('/liquidations/', '/liquidations/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': liquidations_key},
-            Key=new_liquidations_key
-        )
-        delete_file_from_s3(liquidations_key)
+        if copy_file_in_s3(liquidations_key, new_liquidations_key):
+            delete_file_from_s3(liquidations_key)
 
         # enviamos el correo
         print(f"[DEBUG] Enviando correo")

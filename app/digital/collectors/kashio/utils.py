@@ -383,7 +383,7 @@ async def get_data_json_kashio_async(token, from_date, to_date):
     return total_records, token
 
 
-async def process_single_json_file(s3_key, s3_client):
+async def process_single_json_file(s3_key):
     # funcion auxiliar para procesar un solo json a excel en paralelo
     try:
         print(f"[info] procesando {s3_key}...")
@@ -440,12 +440,8 @@ async def process_single_json_file(s3_key, s3_client):
 
         # mover a processed
         processed_key = s3_key.replace("/input/", "/input/processed/", 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={"Bucket": Config.S3_BUCKET, "Key": s3_key},
-            Key=processed_key,
-        )
-        delete_file_from_s3(s3_key)
+        if copy_file_in_s3(s3_key, processed_key):
+            delete_file_from_s3(s3_key)
         print(f"[success] procesado: {s3_key} -> {excel_key}")
         return True
     except Exception as e:
@@ -458,7 +454,6 @@ async def json_excel_kashio_async():
     try:
         s3_prefix = "digital/collectors/kashio/input/"
         s3_files = list_files_in_s3(s3_prefix)
-        s3_client = get_s3_client_with_role()
 
         files_to_process = [
             f for f in s3_files 
@@ -470,7 +465,7 @@ async def json_excel_kashio_async():
             return
 
         print(f"[info] procesando {len(files_to_process)} archivos en paralelo...")
-        tasks = [process_single_json_file(f, s3_client) for f in files_to_process]
+        tasks = [process_single_json_file(f) for f in files_to_process]
         await asyncio.gather(*tasks)
         
         print("[success] proceso json -> excel completado")

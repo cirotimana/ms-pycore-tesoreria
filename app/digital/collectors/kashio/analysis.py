@@ -11,7 +11,6 @@ import pytz
 
 def get_data_kashio(from_date, to_date):
     # obtiene datos de kashio
-    s3_client = get_s3_client_with_role()
     try:
         get_data_main(from_date, to_date)
     except Exception as e:
@@ -35,15 +34,10 @@ def get_data_kashio(from_date, to_date):
 
                         dataframes.append(df)
 
-                    # mover a procesados
                     if "/input/" in s3_key and "/input/processed/" not in s3_key:
                         new_key = s3_key.replace("/input/", "/input/processed/", 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={"Bucket": Config.S3_BUCKET, "Key": s3_key},
-                            Key=new_key,
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
 
                 except Exception as e:
                     print(f"[error] error al procesar {s3_key}: {e}")
@@ -116,8 +110,6 @@ def get_data_calimaco(from_date, to_date):
 def conciliation_data(from_date, to_date):
     # realiza la conciliacion
     try:
-
-        s3_client = get_s3_client_with_role()
         calimaco_prefix = "digital/collectors/kashio/calimaco/output/Calimaco_Kashio_Ventas_"
         kashio_prefix = "digital/collectors/kashio/output/Kashio_Ventas_"
 
@@ -276,23 +268,13 @@ def conciliation_data(from_date, to_date):
         for k, v in metricas.items():
             print(f"- {k}: {v}")
 
-        # mover archivos y obtener las rutas finales
         new_kashio_key = kashio_key.replace("/output/", "/output/processed/", 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={"Bucket": Config.S3_BUCKET, "Key": kashio_key},
-            Key=new_kashio_key,
-        )
-        delete_file_from_s3(kashio_key)
+        if copy_file_in_s3(kashio_key, new_kashio_key):
+            delete_file_from_s3(kashio_key)
 
-        # calimaco
         new_calimaco_key = calimaco_key.replace("/output/", "/output/processed/", 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={"Bucket": Config.S3_BUCKET, "Key": calimaco_key},
-            Key=new_calimaco_key,
-        )
-        delete_file_from_s3(calimaco_key)
+        if copy_file_in_s3(calimaco_key, new_calimaco_key):
+            delete_file_from_s3(calimaco_key)
 
         # enviar correo
         print("[info] enviando correo con resultados")

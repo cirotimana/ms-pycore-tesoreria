@@ -312,7 +312,6 @@ async def process_s3_files_async(from_date_str, to_date_str):
     s3_files = list_files_in_s3(s3_prefix)
     
     dataframes = []
-    s3_client = get_s3_client_with_role()
     
     columnas = [
         'SN1', 'SN2', 'CIP', 'IdComercio', 'SN3', 'Comisión', 'Total', 
@@ -358,12 +357,8 @@ async def process_s3_files_async(from_date_str, to_date_str):
                 # Mover a processed
                 if '/processed/' not in s3_key:
                     new_key = s3_key.replace('/liquidations/', '/liquidations/processed/', 1)
-                    s3_client.copy_object(
-                        Bucket=Config.S3_BUCKET,
-                        CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                        Key=new_key
-                    )
-                    delete_file_from_s3(s3_key)
+                    if copy_file_in_s3(s3_key, new_key):
+                        delete_file_from_s3(s3_key)
                 
             except Exception as e:
                 print(f"[ERROR] Error al procesar {s3_key}: {e}")
@@ -441,7 +436,6 @@ def get_data_join(from_date, to_date):
         
         
 def get_data_pagoefectivo(from_date, to_date):
-    s3_client = get_s3_client_with_role()
     try:
         # get_main_pagoefectivo(from_date, to_date)
         get_main_pagoefectivo(from_date, to_date)
@@ -468,12 +462,8 @@ def get_data_pagoefectivo(from_date, to_date):
                     # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
                     
                 except Exception as e:
                     print(f"[error] Error al procesar {s3_key}: {e}")
@@ -498,12 +488,8 @@ def get_data_pagoefectivo(from_date, to_date):
                     # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
                     
                 except Exception as e:
                     print(f"[error] Error al procesar {s3_key}: {e}")

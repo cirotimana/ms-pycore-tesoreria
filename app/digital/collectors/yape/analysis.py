@@ -10,7 +10,6 @@ from app.digital.collectors.calimaco.main import *
 
 
 def get_data_yape(from_date, to_date):
-    s3_client = get_s3_client_with_role()
     try:
         get_data_main_2(from_date, to_date)
     except Exception as e:
@@ -36,12 +35,8 @@ def get_data_yape(from_date, to_date):
                     # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
 
                 except Exception as e:
                     print(f"Error al procesar {s3_key}: {e}")
@@ -107,7 +102,6 @@ def get_data_calimaco(from_date, to_date):
 def conciliation_data(from_date, to_date):
     try:
         # archivos de donde se alimentaran los df
-        s3_client = get_s3_client_with_role()
         calimaco_prefix = "digital/collectors/yape/calimaco/output/Calimaco_Yape_Ventas_"
         yape_prefix = "digital/collectors/yape/output/Yape_Ventas_"
 
@@ -289,23 +283,13 @@ def conciliation_data(from_date, to_date):
 
 
         # Mover archivos y obtener las rutas finales
-        # Yape
         new_yape_key = yape_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': yape_key},
-            Key=new_yape_key
-        )
-        delete_file_from_s3(yape_key)
+        if copy_file_in_s3(yape_key, new_yape_key):
+            delete_file_from_s3(yape_key)
 
-        # Calimaco
         new_calimaco_key = calimaco_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': calimaco_key},
-            Key=new_calimaco_key
-        )
-        delete_file_from_s3(calimaco_key)
+        if copy_file_in_s3(calimaco_key, new_calimaco_key):
+            delete_file_from_s3(calimaco_key)
         
         # Enviamos el correo con los adjuntos
         print("[INFO] enviando correo con resultados")
@@ -425,7 +409,6 @@ def updated_data_yape():
 
 
 def get_data_yape_1(from_date, to_date):
-    s3_client = get_s3_client_with_role()
     try:
         get_data_main_json(from_date, to_date)
     except Exception as e:
@@ -451,12 +434,8 @@ def get_data_yape_1(from_date, to_date):
                     # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
 
                 except Exception as e:
                     print(f"Error al procesar {s3_key}: {e}")

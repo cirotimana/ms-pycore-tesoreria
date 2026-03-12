@@ -53,12 +53,8 @@ def get_data_pagoefectivo(from_date, to_date, method = 'CNC'):
                     # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
                     
                 except Exception as e:
                     print(f"[error] Error al procesar {s3_key}: {e}")
@@ -83,12 +79,8 @@ def get_data_pagoefectivo(from_date, to_date, method = 'CNC'):
                     # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
                     
                 except Exception as e:
                     print(f"[error] Error al procesar {s3_key}: {e}")

@@ -311,12 +311,8 @@ def conciliation_data(from_date, to_date):
 
         # Calimaco
         new_calimaco_key = calimaco_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': calimaco_key},
-            Key=new_calimaco_key
-        )
-        delete_file_from_s3(calimaco_key)        
+        if copy_file_in_s3(calimaco_key, new_calimaco_key):
+            delete_file_from_s3(calimaco_key)        
         
         # enviar correo
         print("[info] enviando correo con resultados")

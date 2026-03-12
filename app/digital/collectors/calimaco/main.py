@@ -232,7 +232,6 @@ def process_extracted_files(collector_name=None, specific_file_key=None):
         print("[error calimaco] nombre de recaudador no proporcionado")
         return False
     
-    s3_client = get_s3_client_with_role()
     try:
         extracted_dfs = []
         final_csv_key = ""
@@ -278,12 +277,8 @@ def process_extracted_files(collector_name=None, specific_file_key=None):
 
                 # mover archivo a carpeta de procesados
                 processed_key = file_key.replace('/input/', '/input/processed/', 1)
-                s3_client.copy_object(
-                    Bucket=Config.S3_BUCKET,
-                    CopySource={'Bucket': Config.S3_BUCKET, 'Key': file_key},
-                    Key=processed_key
-                )
-                delete_file_from_s3(file_key)
+                if copy_file_in_s3(file_key, processed_key):
+                    delete_file_from_s3(file_key)
 
             except Exception as e:
                 print(f"[error calimaco] error procesando {file_key}: {e}")

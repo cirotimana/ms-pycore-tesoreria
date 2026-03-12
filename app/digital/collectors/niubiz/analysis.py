@@ -47,7 +47,6 @@ def conciliation_data(from_date, to_date):
     try:
         
         # archivos de donde se alimentaran los df
-        s3_client = get_s3_client_with_role()
         calimaco_prefix = "digital/collectors/niubiz/calimaco/output/Calimaco_Niubiz_Ventas_"
         niubiz_prefix = "digital/collectors/niubiz/output/Niubiz_Ventas_"
 
@@ -252,23 +251,13 @@ def conciliation_data(from_date, to_date):
             print(f"- {k}: {v}")
 
         # Mover archivos y obtener las rutas finales
-        # niubiz
         new_niubiz_key = niubiz_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': niubiz_key},
-            Key=new_niubiz_key
-        )
-        delete_file_from_s3(niubiz_key)
+        if copy_file_in_s3(niubiz_key, new_niubiz_key):
+            delete_file_from_s3(niubiz_key)
 
-        # Calimaco
         new_calimaco_key = calimaco_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': calimaco_key},
-            Key=new_calimaco_key
-        )
-        delete_file_from_s3(calimaco_key)
+        if copy_file_in_s3(calimaco_key, new_calimaco_key):
+            delete_file_from_s3(calimaco_key)
         
         # enviar correo
         print("[info] enviando correo con resultados")
@@ -386,7 +375,6 @@ def updated_data_niubiz():
     
     
 def get_data_niubiz_1(from_date, to_date):
-    s3_client = get_s3_client_with_role()
     try:
         get_data_main_json(from_date, to_date)
     except Exception as e:
@@ -409,15 +397,10 @@ def get_data_niubiz_1(from_date, to_date):
                     
                     dataframes.append(df)
                     
-                    # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
 
                 except Exception as e:
                     print(f"Error al procesar {s3_key}: {e}")

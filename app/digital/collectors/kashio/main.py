@@ -59,7 +59,7 @@ def get_main_kashio(from_date = None, to_date = None):
             print(f"operaciones fallidas despues de {elapsed_time:.2f} segundos: {failed_operations}")
             return {
                 "success": False,
-                "message": "algunas operaciones fallaron",
+                "message": f"Algunas operaciones fallaron en {elapsed_time / 60:.2f} minutos",
                 "failed_operations": failed_operations,
                 "successful_operations": [op for op, success in results.items() if success]
             }
@@ -118,7 +118,7 @@ def get_updated_kashio():
             print(f"operaciones fallidas despues de {elapsed_time:.2f} segundos: {failed_operations}")
             return {
                 "success": False,
-                "message": "algunas operaciones fallaron",
+                "message": f"Algunas operaciones fallaron en {elapsed_time / 60:.2f} minutos",
                 "failed_operations": failed_operations,
                 "successful_operations": [op for op, success in results.items() if success]
             }

@@ -33,8 +33,6 @@ def get_kashio_liq(from_date , to_date):
         return False
         
     try:
-
-        s3_client = get_s3_client_with_role()
         
         kashio_prefix = "digital/collectors/kashio/liquidations/Kashio_Aprobados_"
         liquidations_prefix = "digital/collectors/kashio/liquidations/Kashio_Liquidaciones_"
@@ -137,22 +135,13 @@ def get_kashio_liq(from_date , to_date):
 
         #download_file_from_s3_to_local(output_key)
         
-        ##movemos todo a procesado
         new_kashio_key = kashio_key.replace('/liquidations/', '/liquidations/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': kashio_key},
-            Key=new_kashio_key
-        )
-        delete_file_from_s3(kashio_key)
+        if copy_file_in_s3(kashio_key, new_kashio_key):
+            delete_file_from_s3(kashio_key)
         
         new_liquidations_key = liquidations_key.replace('/liquidations/', '/liquidations/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': liquidations_key},
-            Key=new_liquidations_key
-        )
-        delete_file_from_s3(liquidations_key)
+        if copy_file_in_s3(liquidations_key, new_liquidations_key):
+            delete_file_from_s3(liquidations_key)
 
         # enviamos el correo
         print(f"[DEBUG] Enviando correo del perido:")

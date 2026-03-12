@@ -9,7 +9,6 @@ from app.common.s3_utils import *
 from app.digital.collectors.calimaco.main import *
 
 def get_data_safetypay(from_date, to_date):
-    s3_client = get_s3_client_with_role()
     try:
         get_data_main(from_date, to_date)
     except Exception as e:
@@ -30,15 +29,10 @@ def get_data_safetypay(from_date, to_date):
                         df = pd.read_excel(excel_data, dtype={'Id. de operación': str, 'Id. de transacción': str, 'Id. de ventas de comerciantes' : str, 'Número de pedido del comerciante' : str })
                     dataframes.append(df)
                     
-                    # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
                     
                 except Exception as e:
                     print(f"[error] error al procesar {s3_key}: {e}")
@@ -105,8 +99,6 @@ def get_data_calimaco(from_date, to_date):
         
 def conciliation_data(from_date, to_date):
     try:
-        
-        s3_client = get_s3_client_with_role()
         calimaco_prefix = "digital/collectors/safetypay/calimaco/output/Calimaco_Safetypay_Ventas_"
         safetypay_prefix = "digital/collectors/safetypay/output/Safetypay_Ventas_"
 
@@ -273,23 +265,13 @@ def conciliation_data(from_date, to_date):
             print(f"- {k}: {v}")
        
         # Mover a procesados
-        # Safetypay
         new_safetypay_key = safetypay_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': safetypay_key},
-            Key=new_safetypay_key
-        )
-        delete_file_from_s3(safetypay_key)
+        if copy_file_in_s3(safetypay_key, new_safetypay_key):
+            delete_file_from_s3(safetypay_key)
 
-        # Calimaco
         new_calimaco_key = calimaco_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': calimaco_key},
-            Key=new_calimaco_key
-        )
-        delete_file_from_s3(calimaco_key)
+        if copy_file_in_s3(calimaco_key, new_calimaco_key):
+            delete_file_from_s3(calimaco_key)
         
         # Enviamos el correo
         print("[INFO] Enviando correo con resultados...")       
