@@ -346,9 +346,9 @@ async def run_calimaco_collector_async(from_date, to_date, method=None, collecto
     # orquestador asincrono del proceso de extraccion con control de tiempo
     start_time = _time.time()
 
-    print(f"\n{'='*50}")
-    print(f"[inicio calimaco] proceso calimaco | rango: {from_date.date()} a {to_date.date()}")
-    print(f"{'='*50}\n")
+    print(f"\n{'='*100}")
+    print(f"[inicio calimaco] proceso calimaco para {collector_name} | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*100}\n")
 
     try:
         session_token = await session_cache.get_session(force_refresh=True)
@@ -372,10 +372,10 @@ async def run_calimaco_collector_async(from_date, to_date, method=None, collecto
 
     finally:
         elapsed_time = _time.time() - start_time
-        print(f"\n{'='*50}")
-        print(f"[fin calimaco] proceso calimaco completado")
-        print(f"[tiempo calimaco] duracion total: {elapsed_time / 60:.2f} minutos")
-        print(f"{'='*50}\n")
+        print(f"\n{'='*100}")
+        print(f"[fin calimaco-{collector_name}] proceso calimaco para {collector_name} completado")
+        print(f"[tiempo calimaco-{collector_name}] duracion total: {elapsed_time / 60:.2f} minutos")
+        print(f"{'='*100}\n")
 
     return result
 

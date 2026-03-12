@@ -2,6 +2,7 @@ import asyncio
 import pandas as pd
 import pytz
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from app.digital.collectors.nuvei.utils import *
 from app.digital.collectors.nuvei.email_handler import *
 from app.common.database import *
@@ -170,15 +171,13 @@ def conciliation_data(from_date, to_date):
         df2_valid = df2.dropna(subset=['FECHA'])
         df1_valid = df1.dropna(subset=['Fecha'])
         
-        # insertar datos del collector y calimaco de forma dual
+        # Iniciar insercion en base de datos en paralelo
         def initial_save(session):
-            print(f"[debug] insertando registros de nuvei y calimaco")
-            if len(df2_valid) > 0:
-                bulk_upsert_collector_records_optimized(session, df2_valid, 6)  
-            if len(df1_valid) > 0:
-                bulk_upsert_calimaco_records_optimized(session, df1_valid, 6) 
-                
-        run_on_dual_dts(initial_save)
+            bulk_upsert_collector_records_optimized(session, df2_valid, 6)  
+            bulk_upsert_calimaco_records_optimized(session, df1_valid, 6)  
+            
+        executor = ThreadPoolExecutor(max_workers=1)
+        db_future = executor.submit(run_on_dual_dts, initial_save)
         
 
         cols_calimaco = [
@@ -351,6 +350,9 @@ def conciliation_data(from_date, to_date):
             session.commit()
 
         run_on_dual_dts(final_save)
+        
+        # Asegurar que la insercion inicial termino
+        db_future.result()
                 
         print(f"[ok] conciliacion completada exitosamente: {output_key}")
         return True      
@@ -393,20 +395,21 @@ def updated_data_nuvei():
         df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])   
         
-        # insertar datos y actualizar timestamp de forma dual
+        # Iniciar actualizacion en base de datos en paralelo
         def update_save(session):
-            print(f"[debug] insertando registros de nuvei y calimaco (update)")
-            if len(df2) > 0:
-                bulk_upsert_collector_records_optimized(session, df2, 6)  
-            if len(df1) > 0:
-                bulk_upsert_calimaco_records_optimized(session, df1, 6) 
+            bulk_upsert_collector_records_optimized(session, df2, 6) 
+            bulk_upsert_calimaco_records_optimized(session, df1, 6)  
             update_collector_timestamp(session, 6) 
 
-        run_on_dual_dts(update_save)
-
-        # eliminar archivos procesados
+        executor = ThreadPoolExecutor(max_workers=1)
+        db_future = executor.submit(run_on_dual_dts, update_save)
+        
+        # Eliminar archivos procesados inmediatamente mientras la DB trabaja
         delete_file_from_s3(nuvei_key)
         delete_file_from_s3(calimaco_key)
+        
+        # Esperar a que la DB termine
+        db_future.result()
         return True
   
     except Exception as e:

@@ -1,6 +1,7 @@
 import pandas as pd
 import pytz
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from app.digital.collectors.niubiz.utils import *
 from app.digital.collectors.niubiz.email_handler import *
 from app.common.database import *
@@ -64,26 +65,6 @@ def conciliation_data(from_date, to_date):
         calimaco_content = read_file_from_s3(calimaco_key)
         niubiz_content = read_file_from_s3(niubiz_key)
 
-        # df1 = pd.read_csv(BytesIO(calimaco_content), dtype={'ID': str, 'Usuario': str, 'ID externo': str})
-        # df2 = pd.read_csv(BytesIO(niubiz_content), dtype={'N°Voucher/Id pedido': str, 'ID operación': str})
-
-        # df2 = df2.rename(columns={'Fecha y hora de Transacción':'FECHA'})
-        # df2 = df2.rename(columns={'N°Voucher/Id pedido':'ID CALIMACO'})
-        # df2 = df2.rename(columns={'ID operación':'ID PROVEEDOR'})
-        # df2['CLIENTE'] = '-'
-        # df2 = df2.rename(columns={'Monto':'MONTO'})
-        # df2 = df2.rename(columns={'Tipo operación':'ESTADO PROVEEDOR'})
-        
-        # # Limpiar espacios en ID CALIMACO
-        # df2['ID CALIMACO'] = df2['ID CALIMACO'].astype(str).str.strip()
-        
-        # df1 = df1[["ID","Fecha","Fecha de modificación","Estado","Usuario","Cantidad","ID externo","Comentarios"]]
-        # df1['Data'] = "<==>"
-        # df2=df2[["FECHA","ID CALIMACO","ID PROVEEDOR","CLIENTE","MONTO","ESTADO PROVEEDOR",]]
-        
-        # df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
-        # df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
-
         df1 = pd.read_csv(BytesIO(calimaco_content), dtype={'ID': str, 'Usuario': str, 'ID externo': str})
         df2 = pd.read_csv(BytesIO(niubiz_content), dtype={'Nro Pedido': str})
         
@@ -114,12 +95,13 @@ def conciliation_data(from_date, to_date):
         df2 = df2.drop_duplicates(subset=['ID CALIMACO', 'MONTO'], keep='first')
         
         
-        # Insertar datos del collector y Calimaco de forma dual
+        # Iniciar insercion en base de datos en paralelo
         def initial_save(session):
-            bulk_upsert_collector_records_optimized(session, df2, 4) 
-            bulk_upsert_calimaco_records_optimized(session, df1, 4)      
-        
-        run_on_dual_dts(initial_save)
+            bulk_upsert_collector_records_optimized(session, df2, 4)  
+            bulk_upsert_calimaco_records_optimized(session, df1, 4)  
+            
+        executor = ThreadPoolExecutor(max_workers=1)
+        db_future = executor.submit(run_on_dual_dts, initial_save)
 
         cols_calimaco = [
             "ID",
@@ -297,6 +279,9 @@ def conciliation_data(from_date, to_date):
             session.commit()
 
         run_on_dual_dts(final_save)
+        
+        # Asegurar que la insercion inicial termino
+        db_future.result()
                 
         print(f"[ok] conciliacion completada exitosamente: {output_key}")
         return True 
@@ -354,17 +339,21 @@ def updated_data_niubiz():
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
         df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
         
-        # insertar datos y actualizar timestamp de forma dual
+        # Iniciar actualizacion en base de datos en paralelo
         def update_save(session):
-            bulk_upsert_collector_records_optimized(session, df2, 4)  
+            bulk_upsert_collector_records_optimized(session, df2, 4) 
             bulk_upsert_calimaco_records_optimized(session, df1, 4)  
             update_collector_timestamp(session, 4) 
 
-        run_on_dual_dts(update_save)
-
-        # eliminar archivos procesados
+        executor = ThreadPoolExecutor(max_workers=1)
+        db_future = executor.submit(run_on_dual_dts, update_save)
+        
+        # Eliminar archivos procesados mientras la DB trabaja
         delete_file_from_s3(niubiz_key)
         delete_file_from_s3(calimaco_key)
+        
+        # Esperar a que la DB termine
+        db_future.result()
         
         print("[ok] proceso de actualizacion exitoso")
         return True

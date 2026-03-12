@@ -1,6 +1,7 @@
 import pandas as pd
 import pytz
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from app.digital.collectors.safetypay.utils import *
 from app.digital.collectors.safetypay.email_handler import *
 from app.common.database import *
@@ -134,12 +135,13 @@ def conciliation_data(from_date, to_date):
         df2 = df2[df2['ESTADO PROVEEDOR'].isin(['Compra completada'])].drop_duplicates(subset=['ID CALIMACO'], keep='first')
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
 
-        # Insertar datos del collector y Calimaco de forma dual
+        # Iniciar insercion en base de datos en paralelo
         def initial_save(session):
-            bulk_upsert_collector_records_optimized(session, df2, 8)  # 8 = Safetypay
-            bulk_upsert_calimaco_records_optimized(session, df1, 8)  # 8 = Safetypay
-        
-        run_on_dual_dts(initial_save)
+            bulk_upsert_collector_records_optimized(session, df2, 8)  
+            bulk_upsert_calimaco_records_optimized(session, df1, 8)  
+            
+        executor = ThreadPoolExecutor(max_workers=1)
+        db_future = executor.submit(run_on_dual_dts, initial_save)
         
 
         cols_calimaco = [
@@ -311,6 +313,9 @@ def conciliation_data(from_date, to_date):
             session.commit()       
 
         run_on_dual_dts(final_save)
+        
+        # Asegurar que la insercion inicial termino
+        db_future.result()
                 
         print(f"[ok] conciliacion completada exitosamente: {output_key}")
         return True
@@ -359,17 +364,21 @@ def updated_data_safetypay():
         df2 = df2[df2['ESTADO PROVEEDOR'].isin(['Compra completada'])].drop_duplicates(subset=['ID CALIMACO'], keep='first')
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
         
-        # insertar datos y actualizar timestamp de forma dual
+        # Iniciar actualizacion en base de datos en paralelo
         def update_save(session):
-            bulk_upsert_collector_records_optimized(session, df2, 8)  
-            bulk_upsert_calimaco_records_optimized(session, df1, 8) 
+            bulk_upsert_collector_records_optimized(session, df2, 8) 
+            bulk_upsert_calimaco_records_optimized(session, df1, 8)  
             update_collector_timestamp(session, 8) 
 
-        run_on_dual_dts(update_save)
-
-        # eliminar archivos procesados
+        executor = ThreadPoolExecutor(max_workers=1)
+        db_future = executor.submit(run_on_dual_dts, update_save)
+        
+        # Eliminar archivos procesados mientras la DB trabaja
         delete_file_from_s3(safetypay_key)
         delete_file_from_s3(calimaco_key)
+        
+        # Esperar a que la DB termine
+        db_future.result()
         
         print(f"[ok] proceso exitoso para la actualizacion de safetypay")
         return True
