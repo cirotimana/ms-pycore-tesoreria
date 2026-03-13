@@ -150,6 +150,28 @@ async def get_session_cookies(max_attempts=10):
 # =============================
 #   descarga de reportes
 # =============================
+async def check_replica_delay(session_token):
+    # consulta el retraso de la replica de base de datos
+    url = "https://wallet.apuestatotal.com/api/admin/getReplicaDelay"
+    payload = f"session={session_token}"
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "content-type": "application/x-www-form-urlencoded",
+    }
+    
+    try:
+        # no usamos timeout muy largo aqui, es una consulta rapida
+        response = requests.post(url, headers=headers, data=payload, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("result") == "OK":
+                delay = data.get("data", {}).get("delay", 0)
+                return delay
+        return 999 # asume delay alto si falla la consulta
+    except Exception as e:
+        print(f"[warn calimaco] error consultando replica delay: {e}")
+        return 999
+
 async def download_wallet_report(session_token, from_date, to_date, method=None, collector_name=None):
     # descarga reporte de transacciones en un solo rango
     if not session_token or not method or not collector_name:
@@ -168,12 +190,26 @@ async def download_wallet_report(session_token, from_date, to_date, method=None,
     
     print(f"[info calimaco] descargando rango completo desde {from_str} hasta {to_str}")
 
+    # Polling de replica delay antes de pedir el reporte
+    max_wait_attempts = 10
+    for i in range(max_wait_attempts):
+        delay = await check_replica_delay(session_token)
+        print(f"[info calimaco] revision de replica delay: {delay} segundos (intento {i+1}/{max_wait_attempts})")
+        if delay == 0:
+            print("[ok calimaco] replica sincronizada, procediendo con el reporte")
+            break
+        if i < max_wait_attempts - 1:
+            print(f"[info calimaco] esperando 15 segundos a que la replica se sincronice...")
+            await asyncio.sleep(15)
+        else:
+            print("[warn calimaco] timeout esperando replica sync, procediendo de todas formas...")
+
     payload = {
         "session": session_token,
         "company": "ATP",
         "report": "deposits",
         "filter": json.dumps([
-            {"field": "updated_date", "value": [from_str, to_str], "type": "time_range"},
+            {"field": "operation_date", "value": [from_str, to_str], "type": "time_range"},
             {"field": "t.method", "value": f"in {method}", "typeValue": "String", "type": "SelectMultiple", "useLikeFilter": True},
         ]),
         "limit": "",
