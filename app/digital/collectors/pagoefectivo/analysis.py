@@ -93,8 +93,6 @@ def get_data_pagoefectivo(from_date, to_date, method = 'CNC'):
             
             consolidated_df=consolidated_df[colums]
             
-            
-            
             # Guardar en S3
             current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
             output_key = f"digital/collectors/pagoefectivo/output/PagoEfectivo_Ventas_{current_time}.csv"
@@ -121,6 +119,11 @@ def get_data_calimaco(from_date, to_date ):
         method = 'PAGOEFECTIVOQR,PAGOEFECTIVO'
         collector = 'pagoefectivo'
         calimaco_key = get_main_data(from_date, to_date, method, collector)
+
+        if not calimaco_key:
+            print('[error] no se pudo obtener los datos de calimaco')
+            return False
+            
         calimaco_content = read_file_from_s3(calimaco_key)
 
         df = pd.read_csv(BytesIO(calimaco_content), encoding='utf-8', low_memory=False, dtype={'ID': str, 'Usuario': str, 'ID externo': str})
@@ -167,8 +170,11 @@ def conciliation_data(from_date , to_date ):
         calimaco_content = read_file_from_s3(calimaco_key)
         pagoefectivo_content = read_file_from_s3(pagoefectivo_key)
         
-        df1 = pd.read_csv(BytesIO(calimaco_content), encoding='utf-8', low_memory=False, dtype={'ID': str, 'Usuario': str, 'ID externo': str})
-        df2 = pd.read_csv(BytesIO(pagoefectivo_content), encoding='utf-8', low_memory=False,  dtype={'CIP': str, 'Nro.Ord.Comercio': str, 'Nro Documento': str, 'Cliente Telefono': str})
+        calimaco_usecols = ["ID", "Fecha", "Fecha de modificación", "Estado", "Usuario", "Cantidad", "ID externo", "Comentarios"]
+        pagoefectivo_usecols = ["Fec.Cancelación", "Nro.Ord.Comercio", "CIP", "Cliente Nombre", "Monto", "Estado"]
+
+        df1 = pd.read_csv(BytesIO(calimaco_content), encoding='utf-8', low_memory=False, usecols=calimaco_usecols, dtype={'ID': str, 'Usuario': str, 'ID externo': str})
+        df2 = pd.read_csv(BytesIO(pagoefectivo_content), encoding='utf-8', low_memory=False, usecols=pagoefectivo_usecols, dtype={'CIP': str, 'Nro.Ord.Comercio': str})
         
         df2 = df2.rename(columns={'Fec.Cancelación':'FECHA'})
         df2 = df2.rename(columns={'Nro.Ord.Comercio':'ID CALIMACO'})
@@ -214,105 +220,94 @@ def conciliation_data(from_date , to_date ):
         ]
 
 
-        # Condicion 1
-        df1_cond1 = df1[df1['Estado'].isin(['Denegado', 'Nuevo', 'CANCELLED', 'Límites excedidos' ])]
-        df2_cond1 = df2[df2['ESTADO PROVEEDOR'].isin(['Cancelada'])]
-        conciliacion_cond1 = pd.merge(
-        df1_cond1,
-        df2_cond1,
+        ## todos los que no son aprobados en calimaco
+        df_no_aprovated_calimaco = df1[df1['Estado'].isin(['Denegado', 'Nuevo', 'CANCELLED', 'Límites excedidos' ])]
+        ## todos los aprobados en calimaco
+        df_aprovated_calimaco = df1[df1['Estado'] == 'Válido']
+        ## todos los aprobados en el recaudador
+        df_aprovated_recaudador = df2[df2['ESTADO PROVEEDOR'].isin(['Cancelada'])]
+        
+
+        # cambio de estado no aprobados en calimaco vs aprobados en el recaudador
+        df_cambio_estado = pd.merge(
+        df_no_aprovated_calimaco,
+        df_aprovated_recaudador,
         left_on='ID',
         right_on='ID CALIMACO',
         how='inner',
         indicator=False)
 
-        # Condicion 2
-        df1_cond2 = df1[df1['Estado'] == 'Válido']
-        df2_cond2 = df2[df2['ESTADO PROVEEDOR'].isin (['Cancelada'])]
-        conciliacion_cond2 = pd.merge(
-        df1_cond2,
-        df2_cond2,
+        # conciliados aprobados calimaco vs aprobados recaudador
+        df_conciliados = pd.merge(
+        df_aprovated_calimaco,
+        df_aprovated_recaudador,
         left_on='ID',
         right_on='ID CALIMACO',
         how='inner',
         indicator=False)
 
-        # condicion 3 duplicados_pagoefectivo
-        duplicados_df2 = df2[df2.duplicated(subset=["ID CALIMACO"], keep=False)]
+        # duplicados_pagoefectivo
+        df_duplicados = df2[df2.duplicated(subset=["ID CALIMACO"], keep=False)]
+
+        # origincal aporbada del recaudador
+        # df_2 | df_aprovated_recaudador
                 
-        # condicion 4 registros aprobados en calimaco que NO hicieron match con pagoefectivo        
-        approvals_df_calimaco = df1[df1['Estado'] == 'Válido']
-        approvals_df_pagoefectivo = df2[df2['ESTADO PROVEEDOR'].isin(['Cancelada'])]
-        no_match = pd.merge(
-            approvals_df_calimaco,
-            approvals_df_pagoefectivo,
+        # registros aprobados en calimaco que NO hicieron match con pagoefectivo        
+        df_no_conciliados = pd.merge(
+            df_aprovated_calimaco,
+            df_aprovated_recaudador,
             left_on='ID',
             right_on='ID CALIMACO',
             how='outer',
             indicator=True
         )
-        
-        # condicion 5 _ originales
-        df2_original = df2.copy()
-        df2_original = df2_original[df2_original['ESTADO PROVEEDOR'].isin(['Cancelada'])]
 
-        no_match = no_match.rename(columns={'_merge': 'Recaudador Aprobado'})
+        df_no_conciliados = df_no_conciliados.rename(columns={'_merge': 'Recaudador Aprobado'})
         # Cambiar valores
-        no_match['Recaudador Aprobado'] = no_match['Recaudador Aprobado'].cat.rename_categories({
+        df_no_conciliados['Recaudador Aprobado'] = df_no_conciliados['Recaudador Aprobado'].cat.rename_categories({
             'left_only': 'Calimaco Aprobado',
             'right_only': 'PagoEfectivo Aprobado',
             'both': 'Ambos'
         })
-        # Filtrar solo los que están solo en uno de los dos
-        no_match_filtrado = no_match[no_match['Recaudador Aprobado'].isin(['Calimaco Aprobado', 'PagoEfectivo Aprobado'])]
+        # Filtrar solo los que estan solo en uno de los dos
+        df_no_conciliados_filtrado = df_no_conciliados[df_no_conciliados['Recaudador Aprobado'].isin(['Calimaco Aprobado', 'PagoEfectivo Aprobado'])]
         
-        no_conciliados_calimaco = no_match_filtrado[no_match_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado']
-        no_conciliados_calimaco = no_conciliados_calimaco[cols_calimaco]
-        no_conciliados_pagoefectivo = no_match_filtrado[no_match_filtrado['Recaudador Aprobado'] == 'PagoEfectivo Aprobado']
-        no_conciliados_pagoefectivo = no_conciliados_pagoefectivo[cols_pagoefectivo]
+        df_nc_calimaco = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado']
+        df_nc_calimaco = df_nc_calimaco[cols_calimaco]
+        df_nc_pagoefectivo = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'PagoEfectivo Aprobado']
+        df_nc_pagoefectivo = df_nc_pagoefectivo[cols_pagoefectivo]
+
 
         current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
-        output_key = f"digital/apps/total-secure/conciliaciones/processed/PagoEfectivo_Conciliacion_Ventas_{current_time}.csv"
-        
-        with BytesIO() as buffer:
-            conciliacion_cond2.to_csv(buffer, index=False)
-            buffer.seek(0)
-            upload_file_to_s3(buffer.getvalue(), output_key)
-        
         output_key_re = f"digital/apps/total-secure/conciliaciones/processed/PagoEfectivo_Conciliacion_Ventas_{current_time}.xlsx"
         
         with BytesIO() as buffer:
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 save_dfs_to_excel(writer, {
-                    "Operaciones Conciliadas": conciliacion_cond2,
-                    "No Conciliados Calimaco": no_conciliados_calimaco,
-                    "No Conciliados Proveedor": no_conciliados_pagoefectivo,
-                    "Operaciones Duplicadas": duplicados_df2,
-                    "Cambios de Estado": conciliacion_cond1,
-                    "Proveedor Original": df2_original
+                    "Operaciones Conciliadas": df_conciliados,
+                    "No Conciliados Calimaco": df_nc_calimaco,
+                    "No Conciliados Proveedor": df_nc_pagoefectivo,
+                    "Operaciones Duplicadas": df_duplicados,
+                    "Cambios de Estado": df_cambio_estado,
+                    "Proveedor Original": df_aprovated_recaudador,
                 })
             buffer.seek(0)
             upload_file_to_s3(buffer.getvalue(), output_key_re)
-                    
-        conciliacion_content = read_file_from_s3(output_key)
-        conciliadas_df = pd.read_csv(BytesIO(conciliacion_content), encoding='utf-8', low_memory=False)
-            
-        # download_file_from_s3_to_local(output_key)##para pruebitas lo guardo en local
         
-
         metricas = {
             "total_calimaco": len(df1),
             "total_pagoefectivo": len(df2),
-            "aprobados_calimaco": len(approvals_df_calimaco),
-            "aprobados_pagoefectivo": len(approvals_df_pagoefectivo),
-            "recaudacion_calimaco": round(approvals_df_calimaco['Cantidad'].sum(), 2),
-            "recaudacion_pagoefectivo": round(approvals_df_pagoefectivo['MONTO'].sum(), 2),
-            "conciliados_total": len(conciliadas_df),
-            "conciliados_monto_calimaco": round(conciliadas_df["Cantidad"].sum(), 2),
-            "conciliados_monto_pagoefectivo": round(conciliadas_df["MONTO"].sum(), 2),
-            "no_conciliados_calimaco": len(no_conciliados_calimaco),
-            "no_conciliados_pagoefectivo": len(no_conciliados_pagoefectivo),
-            "no_conciliados_monto_calimaco": round(no_conciliados_calimaco["Cantidad"].sum(), 2),
-            "no_conciliados_monto_pagoefectivo": round(no_conciliados_pagoefectivo["MONTO"].sum(), 2)
+            "aprobados_calimaco": len(df_aprovated_calimaco),
+            "aprobados_pagoefectivo": len(df_aprovated_recaudador),
+            "recaudacion_calimaco": round(df_aprovated_calimaco['Cantidad'].sum(), 2),
+            "recaudacion_pagoefectivo": round(df_aprovated_recaudador['MONTO'].sum(), 2),
+            "conciliados_total": len(df_conciliados),
+            "conciliados_monto_calimaco": round(df_conciliados["Cantidad"].sum(), 2),
+            "conciliados_monto_pagoefectivo": round(df_conciliados["MONTO"].sum(), 2),
+            "no_conciliados_calimaco": len(df_nc_calimaco),
+            "no_conciliados_pagoefectivo": len(df_nc_pagoefectivo),
+            "no_conciliados_monto_calimaco": round(df_nc_calimaco["Cantidad"].sum(), 2),
+            "no_conciliados_monto_pagoefectivo": round(df_nc_pagoefectivo["MONTO"].sum(), 2)
         }
         
         print("Datos obtenidos:")
@@ -367,9 +362,6 @@ def conciliation_data(from_date , to_date ):
                 f"s3://{Config.S3_BUCKET}/{new_pagoefectivo_key}",
             )
             insert_conciliation_files(
-                session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{output_key}"
-            )
-            insert_conciliation_files(
                 session, conciliation_id, 2, f"s3://{Config.S3_BUCKET}/{output_key_re}"
             )
             session.commit() 
@@ -379,7 +371,7 @@ def conciliation_data(from_date , to_date ):
         # Asegurar que la insercion inicial termino
         db_future.result()
         
-        print(f"[ok] conciliacion completada exitosamente: {output_key}")
+        print(f"[ok] conciliacion completada exitosamente: {output_key_re}")
         return True
   
     except Exception as e:

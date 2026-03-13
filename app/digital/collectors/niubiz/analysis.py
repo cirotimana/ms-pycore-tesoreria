@@ -14,6 +14,11 @@ def get_data_calimaco(from_date, to_date):
         method = 'NIUBIZ'
         collector = 'niubiz'
         calimaco_key = get_main_data(from_date, to_date, method, collector)
+
+        if not calimaco_key:
+            print('[error] no se pudo obtener los datos de calimaco')
+            return False
+            
         calimaco_content = read_file_from_s3(calimaco_key)
 
         df = pd.read_csv(BytesIO(calimaco_content), encoding='utf-8', low_memory=False, dtype={'ID': str, 'Usuario': str, 'ID externo': str})
@@ -65,8 +70,11 @@ def conciliation_data(from_date, to_date):
         calimaco_content = read_file_from_s3(calimaco_key)
         niubiz_content = read_file_from_s3(niubiz_key)
 
-        df1 = pd.read_csv(BytesIO(calimaco_content), dtype={'ID': str, 'Usuario': str, 'ID externo': str})
-        df2 = pd.read_csv(BytesIO(niubiz_content), dtype={'Nro Pedido': str})
+        calimaco_usecols = ["ID", "Fecha", "Fecha de modificación", "Estado", "Usuario", "Cantidad", "ID externo", "Comentarios"]
+        niubiz_usecols = ["Fecha de Transacción", "Nro Pedido", "Cliente", "Importe Pedido", "Estado"]
+
+        df1 = pd.read_csv(BytesIO(calimaco_content), usecols=calimaco_usecols, low_memory=False, dtype={'ID': str, 'Usuario': str, 'ID externo': str})
+        df2 = pd.read_csv(BytesIO(niubiz_content), usecols=niubiz_usecols, low_memory=False, dtype={'Nro Pedido': str})
         
         df2 = df2[df2['Estado'].isin(['Autorizada', 'Liquidada'])]
         df2['Estado'] = df2['Estado'].replace({
@@ -123,108 +131,88 @@ def conciliation_data(from_date, to_date):
             "ESTADO PROVEEDOR",
         ]
         
+        ## todos los que no son aprobados en calimaco
+        df_no_aprovated_calimaco = df1[df1['Estado'].isin(['Denegado', 'Nuevo', 'CANCELLED', 'Límites excedidos' ])]
+        ## todos los aprobados en calimaco
+        df_aprovated_calimaco = df1[df1['Estado'] == 'Válido']
+        ## todos los aprobados en el recaudador
+        df_aprovated_recaudador = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
 
-        # Condicion 1
-        df1_cond1 = df1[df1['Estado'].isin(['Denegado', 'Nuevo', 'CANCELLED', 'Límites excedidos' ])]
-        df2_cond1 = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
-        # df2_cond1.loc[:, 'ID CALIMACO'] = df2_cond1['ID CALIMACO'].astype(str).str[2:]
-        conciliacion_cond1 = pd.merge(
-        df1_cond1.assign(Numero_compra_temp=df1_cond1['ID'].str[2:]),
-        df2_cond1,
-        # left_on='Numero_compra_temp',
-        # right_on='ID CALIMACO',
+        # cambio de estado no aprobados en calimaco vs aprobados en el recaudador
+        df_cambio_estado = pd.merge(
+        df_no_aprovated_calimaco.assign(Numero_compra_temp=df_no_aprovated_calimaco['ID'].str[2:]),
+        df_aprovated_recaudador,
         left_on=['Numero_compra_temp', 'Cantidad'],
         right_on=['ID CALIMACO', 'MONTO'],
         how='inner',
         indicator=False).drop('Numero_compra_temp', axis=1)
 
-        # condicion 2: ambos aprobados
-        df1_cond2 = df1[df1['Estado'] == 'Válido']
-        df2_cond2 = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
-        # df2_cond2.loc[:, 'ID CALIMACO'] = df2_cond2['ID CALIMACO'].astype(str).str[2:]
-        conciliacion_cond2 = pd.merge(
-        df1_cond2.assign(Numero_compra_temp=df1_cond2['ID'].str[2:]),
-        df2_cond2,
-        # left_on='Numero_compra_temp',
-        # right_on='ID CALIMACO',
+        # conciliados aprobados calimaco vs aprobados recaudador
+        df_conciliados = pd.merge(
+        df_aprovated_calimaco.assign(Numero_compra_temp=df_aprovated_calimaco['ID'].str[2:]),
+        df_aprovated_recaudador,
         left_on=['Numero_compra_temp', 'Cantidad'],
         right_on=['ID CALIMACO', 'MONTO'],
         how='inner',
         indicator=False).drop('Numero_compra_temp', axis=1)
-        
-        
-        #condicion 3 _ duplicados niubiz
-        df2_cond3 = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
-        duplicados_df2 = df2_cond3[df2_cond3.duplicated(subset=['ID CALIMACO', 'MONTO'], keep=False)]
-        
-        
-        # condicion 4 _ registros aprovados que no hicieron match
-        df1_cond4 = df1[df1['Estado'] == 'Válido']
-        df2_cond4 = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
-        no_match = pd.merge(
-        df1_cond4.assign(Numero_compra_temp=df1_cond4['ID'].str[2:]),
-        df2_cond4,
+
+        # duplicados_niubiz
+        df_duplicados = df2[df2.duplicated(subset=["ID CALIMACO"], keep=False)]
+                
+        # registros aprobados en calimaco que NO hicieron match con recaudador        
+        df_no_conciliados = pd.merge(
+        df_aprovated_calimaco.assign(Numero_compra_temp=df_aprovated_calimaco['ID'].str[2:]),
+        df_aprovated_recaudador,
         left_on=['Numero_compra_temp', 'Cantidad'],
         right_on=['ID CALIMACO', 'MONTO'],
         how='outer',
         indicator=True).drop('Numero_compra_temp', axis=1)
-        
-        # condicion 5 _ original
-        df2_original = df2.copy()
-        
-        no_match = no_match.rename(columns={'_merge': 'Recaudador Aprobado'})
+
+        df_no_conciliados = df_no_conciliados.rename(columns={'_merge': 'Recaudador Aprobado'})
         # Cambiar valores
-        no_match['Recaudador Aprobado'] = no_match['Recaudador Aprobado'].cat.rename_categories({
+        df_no_conciliados['Recaudador Aprobado'] = df_no_conciliados['Recaudador Aprobado'].cat.rename_categories({
             'left_only': 'Calimaco Aprobado',
             'right_only': 'Niubiz Aprobado',
             'both': 'Ambos'
         })
-        # Filtrar solo los que están solo en uno de los dos
-        no_match_filtrado = no_match[no_match['Recaudador Aprobado'].isin(['Calimaco Aprobado', 'Niubiz Aprobado'])]
+        # Filtrar solo los que estan solo en uno de los dos
+        df_no_conciliados_filtrado = df_no_conciliados[df_no_conciliados['Recaudador Aprobado'].isin(['Calimaco Aprobado', 'Niubiz Aprobado'])]
         
-        no_conciliados_calimaco = no_match_filtrado[no_match_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado']
-        no_conciliados_calimaco = no_conciliados_calimaco[cols_calimaco]
-        no_conciliados_niubiz = no_match_filtrado[no_match_filtrado['Recaudador Aprobado'] == 'Niubiz Aprobado']
-        no_conciliados_niubiz = no_conciliados_niubiz[cols_niubiz]
+        df_nc_calimaco = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado']
+        df_nc_calimaco = df_nc_calimaco[cols_calimaco]
+        df_nc_niubiz = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Niubiz Aprobado']
+        df_nc_niubiz = df_nc_niubiz[cols_niubiz]
 
-        # Guardar resultado en S3
-        current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
+        # guardar resultado en s3
+        current_time = datetime.now(pytz.timezone("America/Lima")).strftime("%Y%m%d%H%M%S")
         output_key = f"digital/apps/total-secure/conciliaciones/processed/Niubiz_Conciliacion_Ventas_{current_time}.xlsx"
 
         with BytesIO() as buffer:
-            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                conciliacion_cond2.to_excel(writer, sheet_name='Operaciones Conciliadas', index=False)
-                no_conciliados_calimaco.to_excel(writer, sheet_name='No Conciliados Calimaco', index=False)
-                no_conciliados_niubiz.to_excel(writer, sheet_name='No Conciliados Proveedor', index=False)
-                duplicados_df2.to_excel(writer, sheet_name='Operaciones Duplicadas', index=False)
-                conciliacion_cond1.to_excel(writer, sheet_name='Cambios de Estado', index=False)
-                df2_original.to_excel(writer, sheet_name='Proveedor Original', index=False)
+            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                df_conciliados.to_excel(writer, sheet_name="Operaciones Conciliadas", index=False)
+                df_nc_calimaco.to_excel(writer, sheet_name="No Conciliados Calimaco", index=False)
+                df_nc_niubiz.to_excel(writer, sheet_name="No Conciliados Proveedor", index=False)
+                df_duplicados.to_excel(writer, sheet_name="Operaciones Duplicadas", index=False)
+                df_cambio_estado.to_excel(writer, sheet_name="Cambios de Estado", index=False)
+                df_aprovated_recaudador.to_excel(writer, sheet_name="Proveedor Original", index=False)
             buffer.seek(0)
             upload_file_to_s3(buffer.getvalue(), output_key)
-        
-        ##download_file_from_s3_to_local(output_key)##para pruebitas lo guardo en local
-        
-        conciliacion_content = read_file_from_s3(output_key)
-        conciliadas_df = pd.read_excel(BytesIO(conciliacion_content), sheet_name="Operaciones Conciliadas")
-
-        approvals_df_calimaco = df1[df1['Estado'] == 'Válido']
-        approvals_df_niubiz = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
 
 
         metricas = {
             "total_calimaco": len(df1),
             "total_niubiz": len(df2),
-            "aprobados_calimaco": len(approvals_df_calimaco),
-            "aprobados_niubiz": len(approvals_df_niubiz),
-            "recaudacion_calimaco": round(approvals_df_calimaco['Cantidad'].sum(), 2),
-            "recaudacion_niubiz": round(approvals_df_niubiz['MONTO'].sum(), 2),
-            "conciliados_total": len(conciliadas_df),
-            "conciliados_monto_calimaco": round(conciliadas_df["Cantidad"].sum(), 2),
-            "conciliados_monto_niubiz": round(conciliadas_df["MONTO"].sum(), 2),
-            "no_conciliados_calimaco": len(no_conciliados_calimaco),
-            "no_conciliados_niubiz": len(no_conciliados_niubiz),
-            "no_conciliados_monto_calimaco": round(no_conciliados_calimaco["Cantidad"].sum(), 2),
-            "no_conciliados_monto_niubiz": round(no_conciliados_niubiz["MONTO"].sum(), 2)
+            "aprobados_calimaco": len(df_aprovated_calimaco),
+            "aprobados_niubiz": len(df_aprovated_recaudador),
+            "recaudacion_calimaco": round(df_aprovated_calimaco["Cantidad"].sum(), 2),
+            "recaudacion_niubiz": round(df_aprovated_recaudador["MONTO"].sum(), 2),
+            "conciliados_total": len(df_conciliados),
+            "conciliados_monto_calimaco": round(df_conciliados["Cantidad"].sum(), 2),
+            "conciliados_monto_niubiz": round(df_conciliados["MONTO"].sum(), 2),
+            "no_conciliados_calimaco": len(df_nc_calimaco),
+            "no_conciliados_niubiz": len(df_nc_niubiz),
+            "no_conciliados_monto_calimaco": round(df_nc_calimaco["Cantidad"].sum(), 2),
+            "no_conciliados_monto_niubiz": round(df_nc_niubiz["MONTO"].sum(), 2)
         }
         
         print("[info] datos obtenidos")

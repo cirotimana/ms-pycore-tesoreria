@@ -329,10 +329,10 @@ def process_extracted_files(collector_name=None, specific_file_key=None):
                 upload_file_to_s3(output_buffer.getvalue(), final_csv_key)
 
             print(f"[info calimaco] archivo final guardado: {final_csv_key}")
+            return final_csv_key
         else:
             print("[warn calimaco] no se encontraron datos para procesar")
-            
-        return final_csv_key
+            return False
 
     except Exception as e:
         print(f"[error calimaco] falla en procesamiento de archivos: {e}")

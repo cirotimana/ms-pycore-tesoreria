@@ -128,8 +128,11 @@ def conciliation_data(from_date, to_date):
         calimaco_content = read_file_from_s3(calimaco_key)
         kashio_content = read_file_from_s3(kashio_key)
 
-        df1 = pd.read_csv(BytesIO(calimaco_content),encoding="utf-8",low_memory=False,dtype={"ID": str, "Usuario": str, "ID externo": str},)
-        df2 = pd.read_csv(BytesIO(kashio_content),encoding="utf-8",low_memory=False,dtype={"REFERENCIA DE ORDEN": str},)
+        calimaco_usecols = ["ID", "Fecha", "Fecha de modificación", "Estado", "Usuario", "Cantidad", "ID externo", "Comentarios"]
+        kashio_usecols = ["FECHA DE REGISTRO", "REFERENCIA DE ORDEN", "TOTAL", "ESTADO P", "CLIENTE"]
+
+        df1 = pd.read_csv(BytesIO(calimaco_content),encoding="utf-8", low_memory=False, usecols=calimaco_usecols, dtype={"ID": str, "Usuario": str, "ID externo": str})
+        df2 = pd.read_csv(BytesIO(kashio_content),encoding="utf-8", low_memory=False, usecols=kashio_usecols, dtype={"REFERENCIA DE ORDEN": str})
         
         
         df2 = df2.rename(columns={'FECHA DE REGISTRO':'FECHA'})
@@ -142,7 +145,7 @@ def conciliation_data(from_date, to_date):
 
         df1 = df1[["ID","Fecha","Fecha de modificación","Estado","Usuario","Cantidad","ID externo","Comentarios"]]
         df1["Data"] = "<==>"
-        df2=df2[["FECHA","ID CALIMACO","ID PROVEEDOR","CLIENTE","MONTO","ESTADO PROVEEDOR",]]
+        df2=df2[["FECHA","ID CALIMACO","ID PROVEEDOR","CLIENTE","MONTO","ESTADO PROVEEDOR"]]
         
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
         df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
@@ -176,94 +179,88 @@ def conciliation_data(from_date, to_date):
         ]
         
         
-        df2_original = df2.copy()
+        ## todos los que no son aprobados en calimaco
+        df_no_aprovated_calimaco = df1[df1['Estado'].isin(['Denegado', 'Nuevo', 'CANCELLED', 'Límites excedidos' ])]
+        ## todos los aprobados en calimaco
+        df_aprovated_calimaco = df1[df1['Estado'] == 'Válido']
+        ## todos los aprobados en el recaudador
+        df_aprovated_recaudador = df2.copy()
 
-        ## condicion 1 - cambio de estado
-        df1_cond1 = df1[df1["Estado"].isin(["Denegado", "Nuevo", "CANCELLED", "Límites excedidos"])]
-        df2_cond1 = df2.copy()
-        conciliacion_cond1 = pd.merge(
-            df1_cond1,
-            df2_cond1,
-            left_on="ID",
-            right_on="ID CALIMACO",
-            how="inner",
-            indicator=False,
-        )
-        ## condicion 2 - operaciones conciliadas
-        df1_cond2 = df1[df1["Estado"] == "Válido"]
-        df2_cond2 = df2.copy()
-        conciliacion_cond2 = pd.merge(
-            df1_cond2,
-            df2_cond2,
-            left_on="ID",
-            right_on="ID CALIMACO",
-            how="inner",
-            indicator=False,
-        )
-        # condicion 3 - operaciones duplicadas en kashio
-        duplicados_df2 = df2[df2.duplicated(subset=["ID CALIMACO"], keep=False)]
+        # cambio de estado no aprobados en calimaco vs aprobados en el recaudador
+        df_cambio_estado = pd.merge(
+        df_no_aprovated_calimaco,
+        df_aprovated_recaudador,
+        left_on='ID',
+        right_on='ID CALIMACO',
+        how='inner',
+        indicator=False)
 
-        # condicion 4.0 - operaciones aprobadas sin match
-        approvals_df_calimaco = df1[df1["Estado"] == "Válido"]
-        approvals_df_kashio = df2.copy()
-        no_match = pd.merge(
-            approvals_df_calimaco,
-            approvals_df_kashio,
-            left_on="ID",
-            right_on="ID CALIMACO",
-            how="outer",
-            indicator=True,
+        # conciliados aprobados calimaco vs aprobados recaudador
+        df_conciliados = pd.merge(
+        df_aprovated_calimaco,
+        df_aprovated_recaudador,
+        left_on='ID',
+        right_on='ID CALIMACO',
+        how='inner',
+        indicator=False)
+
+        # duplicados_kashio
+        df_duplicados = df2[df2.duplicated(subset=["ID CALIMACO"], keep=False)]
+                
+        # registros aprobados en calimaco que NO hicieron match con recaudador        
+        df_no_conciliados = pd.merge(
+            df_aprovated_calimaco,
+            df_aprovated_recaudador,
+            left_on='ID',
+            right_on='ID CALIMACO',
+            how='outer',
+            indicator=True
         )
 
-        no_match = no_match.rename(columns={"_merge": "Recaudador Aprobado"})
+        df_no_conciliados = df_no_conciliados.rename(columns={'_merge': 'Recaudador Aprobado'})
         # Cambiar valores
-        no_match["Recaudador Aprobado"] = no_match["Recaudador Aprobado"].cat.rename_categories({
-                "left_only": "Calimaco Aprobado",
-                "right_only": "Kashio Aprobado",
-                "both": "Ambos",
-            }
-        )
+        df_no_conciliados['Recaudador Aprobado'] = df_no_conciliados['Recaudador Aprobado'].cat.rename_categories({
+            'left_only': 'Calimaco Aprobado',
+            'right_only': 'Kashio Aprobado',
+            'both': 'Ambos'
+        })
         # Filtrar solo los que estan solo en uno de los dos
-        no_match_filtrado = no_match[no_match["Recaudador Aprobado"].isin(["Calimaco Aprobado", "Kashio Aprobado"])]
+        df_no_conciliados_filtrado = df_no_conciliados[df_no_conciliados['Recaudador Aprobado'].isin(['Calimaco Aprobado', 'Kashio Aprobado'])]
+        
+        df_nc_calimaco = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado']
+        df_nc_calimaco = df_nc_calimaco[cols_calimaco]
+        df_nc_kashio = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Kashio Aprobado']
+        df_nc_kashio = df_nc_kashio[cols_kashio]
 
         # guardar resultado en s3
         current_time = datetime.now(pytz.timezone("America/Lima")).strftime("%Y%m%d%H%M%S")
         output_key = f"digital/apps/total-secure/conciliaciones/processed/Kashio_Conciliacion_Ventas_{current_time}.xlsx"
 
-        no_conciliados_calimaco = no_match_filtrado[no_match_filtrado["Recaudador Aprobado"] == "Calimaco Aprobado"]
-        no_conciliados_calimaco = no_conciliados_calimaco[cols_calimaco]
-        no_conciliados_kashio = no_match_filtrado[no_match_filtrado["Recaudador Aprobado"] == "Kashio Aprobado"]
-        no_conciliados_kashio = no_conciliados_kashio[cols_kashio]
-
         with BytesIO() as buffer:
             with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-                conciliacion_cond2.to_excel(writer, sheet_name="Operaciones Conciliadas", index=False)
-                no_conciliados_calimaco.to_excel(writer, sheet_name="No Conciliados Calimaco", index=False)
-                no_conciliados_kashio.to_excel(writer, sheet_name="No Conciliados Proveedor", index=False)
-                duplicados_df2.to_excel(writer, sheet_name="Operaciones Duplicadas", index=False)
-                conciliacion_cond1.to_excel(writer, sheet_name="Cambios de Estado", index=False)
-                df2_original.to_excel(writer, sheet_name="Proveedor Original", index=False)
+                df_conciliados.to_excel(writer, sheet_name="Operaciones Conciliadas", index=False)
+                df_nc_calimaco.to_excel(writer, sheet_name="No Conciliados Calimaco", index=False)
+                df_nc_kashio.to_excel(writer, sheet_name="No Conciliados Proveedor", index=False)
+                df_duplicados.to_excel(writer, sheet_name="Operaciones Duplicadas", index=False)
+                df_cambio_estado.to_excel(writer, sheet_name="Cambios de Estado", index=False)
+                df_aprovated_recaudador.to_excel(writer, sheet_name="Proveedor Original", index=False)
             buffer.seek(0)
             upload_file_to_s3(buffer.getvalue(), output_key)
-
-        conciliacion_content = read_file_from_s3(output_key)
-        conciliadas_df = pd.read_excel(BytesIO(conciliacion_content), sheet_name="Operaciones Conciliadas")
-
 
         metricas = {
             "total_calimaco": len(df1),
             "total_kashio": len(df2),
-            "aprobados_calimaco": len(approvals_df_calimaco),
-            "aprobados_kashio": len(approvals_df_kashio),
-            "recaudacion_calimaco": round(approvals_df_calimaco["Cantidad"].sum(), 2),
-            "recaudacion_kashio": round(approvals_df_kashio["MONTO"].sum(), 2),
-            "conciliados_total": len(conciliadas_df),
-            "conciliados_monto_calimaco": round(conciliadas_df["Cantidad"].sum(), 2),
-            "conciliados_monto_kashio": round(conciliadas_df["MONTO"].sum(), 2),
-            "no_conciliados_calimaco": len(no_conciliados_calimaco),
-            "no_conciliados_kashio": len(no_conciliados_kashio),
-            "no_conciliados_monto_calimaco": round(no_conciliados_calimaco["Cantidad"].sum(), 2),
-            "no_conciliados_monto_kashio": round(no_conciliados_kashio["MONTO"].sum(), 2)
+            "aprobados_calimaco": len(df_aprovated_calimaco),
+            "aprobados_kashio": len(df_aprovated_recaudador),
+            "recaudacion_calimaco": round(df_aprovated_calimaco["Cantidad"].sum(), 2),
+            "recaudacion_kashio": round(df_aprovated_recaudador["MONTO"].sum(), 2),
+            "conciliados_total": len(df_conciliados),
+            "conciliados_monto_calimaco": round(df_conciliados["Cantidad"].sum(), 2),
+            "conciliados_monto_kashio": round(df_conciliados["MONTO"].sum(), 2),
+            "no_conciliados_calimaco": len(df_nc_calimaco),
+            "no_conciliados_kashio": len(df_nc_kashio),
+            "no_conciliados_monto_calimaco": round(df_nc_calimaco["Cantidad"].sum(), 2),
+            "no_conciliados_monto_kashio": round(df_nc_kashio["MONTO"].sum(), 2)
         }
 
         print("Datos obtenidos:")

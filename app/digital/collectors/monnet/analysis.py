@@ -75,6 +75,11 @@ def get_data_calimaco(from_date, to_date):
         method = 'MONNET,MONNET_QR'
         collector = 'monnet'
         calimaco_key = get_main_data(from_date, to_date, method, collector)
+
+        if not calimaco_key:
+            print('[error] no se pudo obtener los datos de calimaco')
+            return False
+            
         calimaco_content = read_file_from_s3(calimaco_key)
 
         df = pd.read_csv(BytesIO(calimaco_content), encoding='utf-8', low_memory=False, dtype={'ID': str, 'Usuario': str, 'ID externo': str})
@@ -121,9 +126,12 @@ def conciliation_data(from_date, to_date):
         # leer archivos directamente desde S3
         calimaco_content = read_file_from_s3(calimaco_key)
         monnet_content = read_file_from_s3(monnet_key)
+
+        calimaco_usecols = ["ID", "Fecha", "Fecha de modificación", "Estado", "Usuario", "Cantidad", "ID externo", "Comentarios"]
+        monnet_usecols = ["Fecha/hora de Registro", "Id Operacion Comercio", "Nombre Cliente", "Monto", "Estado"]
         
-        df1 = pd.read_csv(BytesIO(calimaco_content), encoding='utf-8', low_memory=False, dtype={'ID': str, 'Usuario': str, 'ID externo': str})
-        df2 = pd.read_csv(BytesIO(monnet_content), encoding='utf-8', low_memory=False, dtype={'Id Operacion Comercio': str})
+        df1 = pd.read_csv(BytesIO(calimaco_content), encoding='utf-8', low_memory=False, usecols=calimaco_usecols, dtype={'ID': str, 'Usuario': str, 'ID externo': str})
+        df2 = pd.read_csv(BytesIO(monnet_content), encoding='utf-8', low_memory=False, usecols=monnet_usecols, dtype={'Id Operacion Comercio': str})
 
         df2 = df2.rename(columns={'Fecha/hora de Registro':'FECHA'})
         df2 = df2.rename(columns={'Id Operacion Comercio':'ID CALIMACO'})
@@ -134,7 +142,7 @@ def conciliation_data(from_date, to_date):
         
         df1 = df1[["ID","Fecha","Fecha de modificación","Estado","Usuario","Cantidad","ID externo","Comentarios"]]
         df1['Data'] = "<==>"
-        df2=df2[["FECHA","ID CALIMACO","ID PROVEEDOR","CLIENTE","MONTO","ESTADO PROVEEDOR",]]
+        df2=df2[["FECHA","ID CALIMACO","ID PROVEEDOR","CLIENTE","MONTO","ESTADO PROVEEDOR"]]
         
         df2 = df2[df2['ESTADO PROVEEDOR'].isin(['Liquidado','Autorizado'])].drop_duplicates(subset=['ID CALIMACO'], keep='first')
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
@@ -168,99 +176,89 @@ def conciliation_data(from_date, to_date):
             "ESTADO PROVEEDOR",
         ]
                 
-        # condicion 1 _ cambios de estado
-        df1_cond1 = df1[df1['Estado'].isin(['Denegado', 'Nuevo', 'CANCELLED', 'Límites excedidos' ])]
-        df2_cond1 = df2[df2['ESTADO PROVEEDOR'].isin(['Liquidado','Autorizado'])]
-        conciliacion_cond1 = pd.merge(
-        df1_cond1,
-        df2_cond1,
-        left_on='ID',
-        right_on='ID CALIMACO',
-        how='inner',
-        indicator=False
-        )
 
-        # condicion 2 _ conciliados
-        df1_cond2 = df1[df1['Estado'] == 'Válido']
-        df2_cond2 = df2[df2['ESTADO PROVEEDOR'].isin (['Liquidado','Autorizado'])]
-        conciliacion_cond2 = pd.merge(
-        df1_cond2,
-        df2_cond2,
+        ## todos los que no son aprobados en calimaco
+        df_no_aprovated_calimaco = df1[df1['Estado'].isin(['Denegado', 'Nuevo', 'CANCELLED', 'Límites excedidos' ])]
+        ## todos los aprobados en calimaco
+        df_aprovated_calimaco = df1[df1['Estado'] == 'Válido']
+        ## todos los aprobados en el recaudador
+        df_aprovated_recaudador = df2[df2['ESTADO PROVEEDOR'].isin(['Liquidado','Autorizado'])]
+
+        # cambio de estado no aprobados en calimaco vs aprobados en el recaudador
+        df_cambio_estado = pd.merge(
+        df_no_aprovated_calimaco,
+        df_aprovated_recaudador,
         left_on='ID',
         right_on='ID CALIMACO',
         how='inner',
-        indicator=False
-        )
-        
-        # condicion 3 _ duplicados
-        df2_cond3 = df2[df2['ESTADO PROVEEDOR'].isin (['Liquidado','Autorizado'])]
-        duplicados_df2 = df2_cond3[df2_cond3.duplicated(subset=["ID CALIMACO"], keep=False)]
-       
-        # condicion 4 _ aprovados sin match 
-        approvals_df_calimaco = df1[df1['Estado'] == 'Válido']
-        approvals_df_monnet = df2[df2['ESTADO PROVEEDOR'].isin(['Liquidado','Autorizado'])]
-        no_match = pd.merge(
-            approvals_df_calimaco,
-            approvals_df_monnet,
+        indicator=False)
+
+        # conciliados aprobados calimaco vs aprobados recaudador
+        df_conciliados = pd.merge(
+        df_aprovated_calimaco,
+        df_aprovated_recaudador,
+        left_on='ID',
+        right_on='ID CALIMACO',
+        how='inner',
+        indicator=False)
+
+        # duplicados_monnet
+        df_duplicados = df2[df2.duplicated(subset=["ID CALIMACO"], keep=False)]
+                
+        # registros aprobados en calimaco que NO hicieron match con recaudador        
+        df_no_conciliados = pd.merge(
+            df_aprovated_calimaco,
+            df_aprovated_recaudador,
             left_on='ID',
             right_on='ID CALIMACO',
             how='outer',
             indicator=True
         )
-        
-        # condicion 5 _ original 
-        df2_original = df2.copy()
-        df2_original = df2_original[df2_original['ESTADO PROVEEDOR'].isin(['Liquidado','Autorizado'])]
-        
-        no_match = no_match.rename(columns={'_merge': 'Recaudador Aprobado'})
+
+        df_no_conciliados = df_no_conciliados.rename(columns={'_merge': 'Recaudador Aprobado'})
         # Cambiar valores
-        no_match['Recaudador Aprobado'] = no_match['Recaudador Aprobado'].cat.rename_categories({
+        df_no_conciliados['Recaudador Aprobado'] = df_no_conciliados['Recaudador Aprobado'].cat.rename_categories({
             'left_only': 'Calimaco Aprobado',
             'right_only': 'Monnet Aprobado',
             'both': 'Ambos'
         })
-        # Filtrar solo los que están solo en uno de los dos
-        no_match_filtrado = no_match[no_match['Recaudador Aprobado'].isin(['Calimaco Aprobado', 'Monnet Aprobado'])]
+        # Filtrar solo los que estan solo en uno de los dos
+        df_no_conciliados_filtrado = df_no_conciliados[df_no_conciliados['Recaudador Aprobado'].isin(['Calimaco Aprobado', 'Monnet Aprobado'])]
         
-        no_conciliados_calimaco = no_match_filtrado[no_match_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado']
-        no_conciliados_calimaco = no_conciliados_calimaco[cols_calimaco]
-        no_conciliados_monnet = no_match_filtrado[no_match_filtrado['Recaudador Aprobado'] == 'Monnet Aprobado']
-        no_conciliados_monnet = no_conciliados_monnet[cols_monnet]
+        df_nc_calimaco = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado']
+        df_nc_calimaco = df_nc_calimaco[cols_calimaco]
+        df_nc_monnet = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Monnet Aprobado']
+        df_nc_monnet = df_nc_monnet[cols_monnet]
 
-        # Guardar resultado en S3
-        current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
+        # guardar resultado en s3
+        current_time = datetime.now(pytz.timezone("America/Lima")).strftime("%Y%m%d%H%M%S")
         output_key = f"digital/apps/total-secure/conciliaciones/processed/Monnet_Conciliacion_Ventas_{current_time}.xlsx"
 
         with BytesIO() as buffer:
-            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                conciliacion_cond2.to_excel(writer, sheet_name='Operaciones Conciliadas', index=False)
-                no_conciliados_calimaco.to_excel(writer, sheet_name='No Conciliados Calimaco', index=False)
-                no_conciliados_monnet.to_excel(writer, sheet_name='No Conciliados Proveedor', index=False)
-                duplicados_df2.to_excel(writer, sheet_name='Operaciones Duplicadas', index=False)
-                conciliacion_cond1.to_excel(writer, sheet_name='Cambios de Estado', index=False)
-                df2_original.to_excel(writer, sheet_name='Proveedor Original', index=False)
+            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                df_conciliados.to_excel(writer, sheet_name="Operaciones Conciliadas", index=False)
+                df_nc_calimaco.to_excel(writer, sheet_name="No Conciliados Calimaco", index=False)
+                df_nc_monnet.to_excel(writer, sheet_name="No Conciliados Proveedor", index=False)
+                df_duplicados.to_excel(writer, sheet_name="Operaciones Duplicadas", index=False)
+                df_cambio_estado.to_excel(writer, sheet_name="Cambios de Estado", index=False)
+                df_aprovated_recaudador.to_excel(writer, sheet_name="Proveedor Original", index=False)
             buffer.seek(0)
             upload_file_to_s3(buffer.getvalue(), output_key)
-        
-        ##analisamos igualdades
-        conciliacion_content = read_file_from_s3(output_key)
-        conciliadas_df = pd.read_excel(BytesIO(conciliacion_content), sheet_name="Operaciones Conciliadas")
 
         metricas = {
             "total_calimaco": len(df1),
             "total_monnet": len(df2),
-            "aprobados_calimaco": len(approvals_df_calimaco),
-            "aprobados_monnet": len(approvals_df_monnet),
-            "recaudacion_calimaco": round(approvals_df_calimaco['Cantidad'].sum(), 2),
-            "recaudacion_monnet": round(approvals_df_monnet['MONTO'].sum(), 2),
-            "conciliados_total": len(conciliadas_df),
-            "conciliados_monto_calimaco": round(conciliadas_df["Cantidad"].sum(), 2),
-            "conciliados_monto_monnet": round(conciliadas_df["MONTO"].sum(), 2),
-            "no_conciliados_calimaco": len(no_conciliados_calimaco),
-            "no_conciliados_monnet": len(no_conciliados_monnet),
-            "no_conciliados_monto_calimaco": round(no_conciliados_calimaco["Cantidad"].sum(), 2),
-            "no_conciliados_monto_monnet": round(no_conciliados_monnet["MONTO"].sum(), 2)
-
+            "aprobados_calimaco": len(df_aprovated_calimaco),
+            "aprobados_monnet": len(df_aprovated_recaudador),
+            "recaudacion_calimaco": round(df_aprovated_calimaco["Cantidad"].sum(), 2),
+            "recaudacion_monnet": round(df_aprovated_recaudador["MONTO"].sum(), 2),
+            "conciliados_total": len(df_conciliados),
+            "conciliados_monto_calimaco": round(df_conciliados["Cantidad"].sum(), 2),
+            "conciliados_monto_monnet": round(df_conciliados["MONTO"].sum(), 2),
+            "no_conciliados_calimaco": len(df_nc_calimaco),
+            "no_conciliados_monnet": len(df_nc_monnet),
+            "no_conciliados_monto_calimaco": round(df_nc_calimaco["Cantidad"].sum(), 2),
+            "no_conciliados_monto_monnet": round(df_nc_monnet["MONTO"].sum(), 2)
         }
         
         print("datos obtenidos:")
