@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import pytz
 from app.config import Config
 import time
+from app.common.utils import format_duration
 from app.common.s3_utils import *
 import urllib3
 import imaplib
@@ -306,7 +307,7 @@ async def wait_for_tupay_link_async(timeout=1200, interval=60):
         print(f"[info tupay] link no disponible aun, proxima revision en {interval} segundos...")
         await asyncio.sleep(interval)  
         
-    print(f"[error tupay] No se encontro el link despues de {(time.time() - start)/60:.2f} minutos")
+    print(f"[error tupay] No se encontro el link despues de {format_duration(elapsed_time)} minutos")
     return None
 
 
@@ -610,7 +611,7 @@ def get_data_main(from_date, to_date):
     elapsed_time = time.time() - start_time
     print(f"\n{'='*50}")
     print(f"[fin] proceso tupay completado")
-    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+    print(f"[tiempo] duracion total: {format_duration(elapsed_time)} minutos")
     print(f"{'='*50}\n")
     return success
 

@@ -7,6 +7,7 @@ import json
 import pytz
 from app.config import Config
 from io import BytesIO
+from app.common.utils import format_duration
 from app.common.s3_utils import *
 import time
 
@@ -528,7 +529,7 @@ def get_data_main(from_date, to_date):
     elapsed_time = time.time() - start_time
     print(f"\n{'='*50}")
     print(f"[fin] proceso safetypay completado")
-    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+    print(f"[tiempo] duracion total: {format_duration(elapsed_time)} minutos")
     print(f"{'='*50}\n")
     return success
 

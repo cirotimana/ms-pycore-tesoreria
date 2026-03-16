@@ -9,6 +9,7 @@ from app.config import Config
 from io import BytesIO
 from app.common.s3_utils import *
 import time
+from app.common.utils import format_duration
 from contextlib import contextmanager
 import random
 
@@ -544,7 +545,7 @@ def get_data_main(from_date, to_date):
         
         print(f"\n{'='*50}")
         print(f"[fin] proceso kashio completado")
-        print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+        print(f"[tiempo] duracion total: {format_duration(elapsed_time)} minutos")
         print(f"{'='*50}\n")
     
     return result

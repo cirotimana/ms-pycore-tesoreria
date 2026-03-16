@@ -8,6 +8,7 @@ import pytz
 import time
 from app.config import Config
 from io import BytesIO
+from app.common.utils import format_duration
 from app.common.s3_utils import *
 from app.digital.collectors.monnet.get_qr_2mf.use_secret import main as get_validator_main
 
@@ -465,7 +466,7 @@ def get_data_main(from_date, to_date):
 
         print(f"\n{'='*50}")
         print(f"[fin] proceso monnet completado")
-        print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+        print(f"[tiempo] duracion total: {format_duration(elapsed_time)} minutos")
         print(f"{'='*50}\n")
 
     return result

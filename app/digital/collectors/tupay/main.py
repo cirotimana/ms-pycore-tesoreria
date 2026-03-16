@@ -1,5 +1,5 @@
 from app.digital.collectors.tupay.analysis import *
-from app.common.utils import validate_date_range
+from app.common.utils import validate_date_range, format_duration
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 import pytz
@@ -45,10 +45,10 @@ def get_main_tupay(from_date = None, to_date = None):
         elapsed_time = time.time() - start_time
     
         if all_success:
-            print(f"[ok] Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos")
+            print(f"[ok] Todas las operaciones completadas exitosamente en {format_duration(elapsed_time)} minutos")
             return {
                 "success": True,
-                "message": f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos",
+                "message": f"Todas las operaciones completadas exitosamente en {format_duration(elapsed_time)} minutos",
                 "failed_operations": []
             }
         else:
@@ -63,7 +63,7 @@ def get_main_tupay(from_date = None, to_date = None):
             print(f"[warn] operaciones fallidas despues de {elapsed_time:.2f} segundos: {failed_operations}")
             return {
                 "success": False,
-                "message": f"Algunas operaciones fallaron en {elapsed_time / 60:.2f} minutos",
+                "message": f"Algunas operaciones fallaron en {format_duration(elapsed_time)} minutos",
                 "failed_operations": failed_operations,
                 "successful_operations": [op for op, success in results.items() if success]
             }
@@ -108,10 +108,10 @@ def get_updated_tupay():
         elapsed_time = time.time() - start_time
     
         if all_success:
-            print(f"[ok] Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos")
+            print(f"[ok] Todas las operaciones completadas exitosamente en {format_duration(elapsed_time)} minutos")
             return {
                 "success": True,
-                "message": f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos",
+                "message": f"Todas las operaciones completadas exitosamente en {format_duration(elapsed_time)} minutos",
                 "failed_operations": []
             }
         else:
@@ -126,7 +126,7 @@ def get_updated_tupay():
             print(f"[warn] operaciones fallidas despues de {elapsed_time:.2f} segundos: {failed_operations}")
             return  {
                 "success": False,
-                "message": f"Algunas operaciones fallaron en {elapsed_time / 60:.2f} minutos",
+                "message": f"Algunas operaciones fallaron en {format_duration(elapsed_time)} minutos",
                 "failed_operations": failed_operations,
                 "successful_operations": [op for op, success in results.items() if success]
             }

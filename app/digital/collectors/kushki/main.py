@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pytz
 import time
 from concurrent.futures import ThreadPoolExecutor
-from app.common.utils import validate_date_range
+from app.common.utils import validate_date_range, format_duration
 
 
 def get_main_kushki(from_date=None, to_date=None):
@@ -50,10 +50,10 @@ def get_main_kushki(from_date=None, to_date=None):
         all_success = all(results.values())
 
         if all_success:
-            print(f"[ok] Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos")
+            print(f"[ok] Todas las operaciones completadas exitosamente en {format_duration(elapsed_time)} minutos")
             return {
                 "success": True,
-                "message": f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos",
+                "message": f"Todas las operaciones completadas exitosamente en {format_duration(elapsed_time)} minutos",
                 "failed_operations": []
             }
         else:
@@ -68,7 +68,7 @@ def get_main_kushki(from_date=None, to_date=None):
             print(f"[warn] operaciones fallidas despues de {elapsed_time:.2f} segundos: {failed_operations}")
             return {
                 "success": False,
-                "message": f"Algunas operaciones fallaron en {elapsed_time / 60:.2f} minutos",
+                "message": f"Algunas operaciones fallaron en {format_duration(elapsed_time)} minutos",
                 "failed_operations": failed_operations,
                 "successful_operations": [op for op, success in results.items() if success]
             }
@@ -116,10 +116,10 @@ def get_updated_kushki():
         all_success = all(results.values())
 
         if all_success:
-            print(f"[ok] Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos")
+            print(f"[ok] Todas las operaciones completadas exitosamente en {format_duration(elapsed_time)} minutos")
             return {
                 "success": True,
-                "message": f"Todas las operaciones completadas exitosamente en {elapsed_time / 60:.2f} minutos",
+                "message": f"Todas las operaciones completadas exitosamente en {format_duration(elapsed_time)} minutos",
                 "failed_operations": []
             }
         else:
@@ -134,7 +134,7 @@ def get_updated_kushki():
             print(f"[warn] operaciones fallidas despues de {elapsed_time:.2f} segundos: {failed_operations}")
             return {
                 "success": False,
-                "message": f"Algunas operaciones fallaron en {elapsed_time / 60:.2f} minutos",
+                "message": f"Algunas operaciones fallaron en {format_duration(elapsed_time)} minutos",
                 "failed_operations": failed_operations,
                 "successful_operations": [op for op, success in results.items() if success]
             }

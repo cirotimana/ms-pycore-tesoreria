@@ -9,6 +9,7 @@ import time
 from app.config import Config
 from io import BytesIO
 from app.common.s3_utils import *
+from app.common.utils import format_duration
 
 
 # =============================
@@ -361,7 +362,7 @@ def get_data_main_json(from_date, to_date):
 
         print(f"\n{'='*50}")
         print(f"[fin] proceso niubiz completado")
-        print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+        print(f"[tiempo] duracion total: {format_duration(elapsed_time)} minutos")
         print(f"{'='*50}\n")
 
     return result

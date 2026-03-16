@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import json
 import pytz
 from app.config import Config
+from app.common.utils import format_duration
 from io import BytesIO
 import time
 from app.common.s3_utils import *
@@ -699,7 +700,7 @@ def get_data_main_2(from_date, to_date):
     elapsed_time = time.time() - start_time
     print(f"\n{'='*50}")
     print(f"[fin] proceso yape completado")
-    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+    print(f"[tiempo] duracion total: {format_duration(elapsed_time)} minutos")
     print(f"{'='*50}\n")
     return result
 
@@ -1020,7 +1021,7 @@ def get_data_main_json(from_date, to_date):
     elapsed_time = time.time() - start_time
     print(f"\n{'='*50}")
     print(f"[fin] proceso yape json completado")
-    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+    print(f"[tiempo] duracion total: {format_duration(elapsed_time)} minutos")
     print(f"{'='*50}\n")
     return result
 

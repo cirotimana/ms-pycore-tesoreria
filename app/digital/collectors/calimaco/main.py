@@ -1,5 +1,7 @@
 import requests
 import json
+import time
+from app.common.utils import format_duration
 from datetime import datetime, timedelta
 from app.common.s3_utils import *
 import pandas as pd
@@ -410,7 +412,7 @@ async def run_calimaco_collector_async(from_date, to_date, method=None, collecto
         elapsed_time = _time.time() - start_time
         print(f"\n{'='*100}")
         print(f"[fin calimaco-{collector_name}] proceso calimaco para {collector_name} completado")
-        print(f"[tiempo calimaco-{collector_name}] duracion total: {elapsed_time / 60:.2f} minutos")
+        print(f"[tiempo calimaco-{collector_name}] duracion total: {format_duration(elapsed_time)} minutos")
         print(f"{'='*100}\n")
 
     return result
