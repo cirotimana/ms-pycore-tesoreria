@@ -1,5 +1,10 @@
 from fastapi_utilities import repeat_at
 import asyncio
+import os
+
+# Configurar zona horaria de peru explicitamente para los crons
+os.environ["TZ"] = "America/Lima"
+
 from app.utils.endpoint_lock import endpoint_lock 
 
 
