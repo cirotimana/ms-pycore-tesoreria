@@ -29,3 +29,10 @@ def validate_date_range(from_date, to_date):
         return False, None, None
     
     return True, from_date, to_date
+
+
+def format_duration(seconds: float) -> str:
+    # convierte segundos a formato M:S (ej: 4:37 minutos)
+    minutes = int(seconds // 60)
+    remaining_seconds = int(seconds % 60)
+    return f"{minutes}:{remaining_seconds:02d}"

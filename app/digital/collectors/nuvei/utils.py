@@ -4,6 +4,7 @@ from playwright.async_api import async_playwright
 import requests
 from datetime import datetime, timedelta
 from app.config import Config
+from app.common.utils import format_duration
 from app.common.s3_utils import *
 from app.digital.collectors.nuvei.get_qr_2mf.use_secret import main as get_validator_main
 import re
@@ -444,7 +445,7 @@ async def get_main_download(from_date, to_date):
 
     print(f"\n{'='*50}")
     print(f"[fin] proceso nuvei completado")
-    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+    print(f"[tiempo] duracion total: {format_duration(elapsed_time)} minutos")
     print(f"{'='*50}\n")
 
     if downloaded_s3_keys:
