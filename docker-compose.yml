@@ -41,7 +41,7 @@ services:
     container_name: worker-ts
     build: .
     # Ejecuta Celery
-    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=5
+    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=10
     volumes:
       - .:/app
     # Limites de recursos recomendados para evitar congelar el host completo
