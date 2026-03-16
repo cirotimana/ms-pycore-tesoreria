@@ -30,6 +30,7 @@ services:
 
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
+      - TZ=America/Lima
     env_file:
       - .env
     depends_on:
@@ -51,6 +52,7 @@ services:
           memory: 4G
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
+      - TZ=America/Lima
     env_file:
       - .env
     depends_on:
