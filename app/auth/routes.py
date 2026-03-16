@@ -24,13 +24,13 @@ def debug_headers(request: Request):
 @router.post("/login", response_model=LoginResponse)
 def login(
     credentials: LoginRequest,
-    session: Session = Depends(get_dts_aws_session) ###se cambio a _awv
+    session: Session = Depends(get_dts_aws_session) # se cambio a aws
 ):
     # buscar usuario por username
     statement = select(TblUser).where(
         TblUser.username == credentials.username,
-        TblUser.is_active == True,
-        TblUser.deleted_at.is_(None)
+        TblUser.activo == True,
+        TblUser.delete_at.is_(None)
     )
     user = session.exec(statement).first()
 
@@ -44,7 +44,7 @@ def login(
         )
 
     if not verify_password(credentials.password, user.password):
-        print(f"[LOGIN DEBUG] Fallo: Contraseña incorrecta")
+        print(f"[debug] fallo: contraseña incorrecta")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="credenciales invalidas",
@@ -77,5 +77,5 @@ def get_current_user_info(
         email=current_user.email,
         first_name=current_user.first_name,
         last_name=current_user.last_name,
-        is_active=current_user.is_active
+        is_active=current_user.activo
     )

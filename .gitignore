@@ -82,3 +82,4 @@ data/debug_output/*
 CODING_GUIDELINES.md
 AUTH_DOCUMENTATION.md
 tests/*
+.antigravity/*

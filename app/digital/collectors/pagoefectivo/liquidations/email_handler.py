@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
+﻿from datetime import datetime, timedelta
 import pytz
 import os
 from app.config import Config
-from app.common.mail import send_mail, sendMailOffice365
+from app.common.mail import send_mail_office_365
 from app.common.s3_utils import *
 
 def send_liquidation_email(s3_key, metricas, period):
@@ -32,7 +32,7 @@ def send_liquidation_email(s3_key, metricas, period):
     referencias_html = "".join([f"<li>{ref}</li>" for ref in metricas['referencias']])
 
     subject = f'Liquidacion PagoEfectivo {period}'
-    recipients = Config.CORREO_PAGOEFECTIVO_LIQ.split(',')
+    recipients = Config.EMAIL_PAGOEFECTIVO_LIQ.split(',')
     mensaje_html = f"""
     <!DOCTYPE html>
     <html>
@@ -129,7 +129,7 @@ def send_liquidation_email(s3_key, metricas, period):
                             <td align="center">
                                 <h2 style="color: #495057; margin-top: 0; margin-bottom: 15px;">Descargar Reporte Detallado</h2>
                                 <p style="color: #495057; margin: 0 0 5px 0;"><strong>Archivo:</strong> {filename}</p>
-                                <p style="color: #495057; margin: 0 0 20px 0;"><strong>Tamaño:</strong> {file_size:.2f} MB</p>
+                                <p style="color: #495057; margin: 0 0 20px 0;"><strong>TamaÃ±o:</strong> {file_size:.2f} MB</p>
                                 <div style="margin: 20px 0;">
                                     <a href="{download_link}" 
                                        style="color : #0F6CBD">
@@ -148,7 +148,7 @@ def send_liquidation_email(s3_key, metricas, period):
                         <tr>
                             <td align="center" style="padding-top: 30px; color: #777; font-size: 0.9em;">
                                 <p>Este reporte de liquidacion fue generado automaticamente - {hora_actual}</p>
-                                <p style="margin: 10px 0 0; font-size: 12px; color: #666;">Prevencion de Fraude - Optimizacion Operativa<br>© {anio_actual}</p>
+                                <p style="margin: 10px 0 0; font-size: 12px; color: #666;">Prevencion de Fraude - Optimizacion Operativa<br>Â© {anio_actual}</p>
                             </td>
                         </tr>
                     </table>
@@ -160,7 +160,7 @@ def send_liquidation_email(s3_key, metricas, period):
     """
 
     # enviar correo con adjunto en memoria
-    sendMailOffice365(Config.SMTP_USER, subject, mensaje_html, recipients, None)
+    send_mail_office_365(Config.SMTP_USER, subject, mensaje_html, recipients, None)
     
 # Ejemplo de uso
 if __name__ == "__main__":
@@ -176,3 +176,4 @@ if __name__ == "__main__":
     }
 
     send_liquidation_email('digital/collectors/kashio/liquidations/processed/Kashio_Liquidations_Processed_DIA2_202510011810.xlsx', metricas, '2024-01-15')
+

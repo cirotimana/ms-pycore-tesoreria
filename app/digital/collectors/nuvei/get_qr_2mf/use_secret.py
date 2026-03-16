@@ -8,11 +8,11 @@ def main():
     label = "Nuvei:cirotimana"
     secret = load_secret(label)
     if not secret:
-        print(f"[!] No se encontro una clave guardada con el nombre '{label}'.")
+        print(f"[alerta] No se encontro una clave guardada con el nombre '{label}'.")
         return
 
     code = generate_otp(secret)
-    print(f"[✔] Codigo OTP para {label}: {code}")
+    print(f"[ok] Codigo OTP para {label}: {code}")
     return code
 
 if __name__ == "__main__":

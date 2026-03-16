@@ -26,23 +26,23 @@ class TokenCachePagoEfectivo:
             
             if (not force_refresh and self.token and 
                 self.expires_at and now < self.expires_at):
-                print("[INFO] Usando token PagoEfectivo del cache")
+                print("[info] usando token pagoefectivo del cache")
                 return self.token
 
-            print("[INFO] Obteniendo nuevo token PagoEfectivo...")
+            print("[info] obteniendo nuevo token pagoefectivo...")
             self.token = await get_token_pagoefectivo()
             
             if self.token:
-                # Token valido por 30 minutos
+                # token valido por 30 minutos
                 self.expires_at = now + timedelta(minutes=30)
-                print(f"[INFO] Token PagoEfectivo cacheado hasta {self.expires_at}")
+                print(f"[info] token pagoefectivo cacheado hasta {self.expires_at}")
             else:
-                print("[ERROR] No se pudo obtener nuevo token PagoEfectivo")
+                print("[error] no se pudo obtener nuevo token pagoefectivo")
             
             return self.token
 
     def invalidate(self):
-        print("[INFO] Invalidando token PagoEfectivo cacheado")
+        print("[info] invalidando token pagoefectivo cacheado")
         self.token = None
         self.expires_at = None
 
@@ -119,10 +119,10 @@ async def get_token_pagoefectivo():
                 await asyncio.sleep(1)
 
             if token_found:
-                print("[✔] Token capturado exitosamente.")
+                print("[ok] Token capturado exitosamente.")
                 return token_found
             else:
-                print("[✖] No se encontro token despues de 30 segundos.")
+                print("[error] No se encontro token despues de 30 segundos.")
                 return None
                 
     except Exception as e:
@@ -255,7 +255,7 @@ async def get_data_pagoefectivo_async(bearer, from_date, to_date):
     return request_count, current_token
 
 
-async def get_routes_pagoefectivo_async(bearer, request_count, max_attempts=60, wait_seconds=120):
+async def get_routes_pagoefectivo_async(bearer, request_count, max_attempts=5, wait_seconds=120):
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
@@ -492,8 +492,24 @@ async def get_main_pagoefectivo_async(from_date, to_date):
 
 
 def get_main_pagoefectivo(from_date, to_date):
+    start_time = time.time()
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso extraccion async pagoefectivo | rango: {from_date} a {to_date}")
+    print(f"{'='*50}\n")
     print(f"[WRAPPER] Ejecutando PagoEfectivo collector")
-    return asyncio.run(get_main_pagoefectivo_async(from_date, to_date))
+
+    try:
+        result = asyncio.run(get_main_pagoefectivo_async(from_date, to_date))
+    except Exception as e:
+        print(f"[ERROR] Error en get_main_pagoefectivo: {e}")
+        return None
+        
+    elapsed_time = time.time() - start_time
+    print(f"\n{'='*50}")
+    print(f"[fin] proceso pagoefectivo completado")
+    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+    print(f"{'='*50}\n")
+    return result
 
 
 # =============================
@@ -524,7 +540,7 @@ def get_data_json_pagoefectivo(token, from_date, to_date):
     else:
         end_date = to_date
         
-    print(f"[INFO] Descargando transacciones del: {start_date.strftime('%Y-%m-%d')} al {end_date.strftime('%Y-%m-%d')}")
+    print(f"[info] descargando transacciones del: {start_date.strftime('%Y-%m-%d')} al {end_date.strftime('%Y-%m-%d')}")
 
     headers = {
             "Accept": "application/json",
@@ -540,7 +556,7 @@ def get_data_json_pagoefectivo(token, from_date, to_date):
     while current <= end_date:
         current_date_str = current.strftime("%Y-%m-%d")
 
-        print(f"[INFO] Descargando transacciones del {current_date_str}")
+        print(f"[info] descargando transacciones del {current_date_str}")
 
         page = 1
         day_data = []  
@@ -575,7 +591,6 @@ def get_data_json_pagoefectivo(token, from_date, to_date):
                     response = requests.post(url, headers=headers, json=body, timeout=120)
                     if response.status_code == 200:
                         data = response.json()
-                        print(f"[DEBUG] Response keys: {list(data.keys()) if isinstance(data, dict) else 'Not dict'}")
                         
                         if isinstance(data, dict) and "Value" in data:
                             records = data["Value"]
@@ -585,12 +600,12 @@ def get_data_json_pagoefectivo(token, from_date, to_date):
                             records = data if isinstance(data, list) else []
                             
                         if not records:
-                            print(f"[ALERTA] No hay registros para {current_date_str}, pagina {page}")
+                            print(f"[warn] no hay registros para {current_date_str}, pagina {page}")
                             has_more_pages = False
                             break
                             
                         day_data.extend(records)
-                        print(f"[INFO] Descargados {len(records)} registros (pagina {page})")
+                        print(f"[info] descargados {len(records)} registros (pagina {page})")
                         
                         # verificar si hay mas paginas
                         if len(records) < size:
@@ -601,33 +616,33 @@ def get_data_json_pagoefectivo(token, from_date, to_date):
                         break  # adios
                         
                     elif response.status_code == 504:
-                        print(f"[ALERTA] Timeout (504) en pagina {page}. Intento {attempt + 1}/{max_retries}")
+                        print(f"[warn] timeout (504) en pagina {page}. intento {attempt + 1}/{max_retries}")
                         if attempt < max_retries - 1:
                             time.sleep(5)
                         else:
-                            print(f"[ALERTA] Fallo por timeout en pagina {page}")
+                            print(f"[error] fallo por timeout en pagina {page}")
                             has_more_pages = False
                     elif response.status_code == 401:
-                        print(f"[ALERTA] Error de autorizacion (401) en pagina {page}. Intento {attempt + 1}/{max_retries}")
+                        print(f"[warn] error de autorizacion (401) en pagina {page}. intento {attempt + 1}/{max_retries}")
                         if attempt < max_retries - 1:
-                            print("[INFO] Intentando renovar token Pagoefectivo...")
+                            print("[info] intentando renovar token pagoefectivo...")
                             token = asyncio.run(get_token_pagoefectivo())
                             if token:
                                 headers["Authorization"] = token
-                                print("[INFO] Token Pagoefectivo renovado correctamente.")
+                                print("[info] token pagoefectivo renovado correctamente.")
                             else:
-                                print("[ALERTA] No se pudo renovar el token Pagoefectivo.")
+                                print("[warn] no se pudo renovar el token pagoefectivo.")
                             time.sleep(5)
                         else:
-                            print(f"[ALERTA] Fallo por error de autorizacion en pagina {page}")
+                            print(f"[warn] fallo por error de autorizacion en pagina {page}")
                             has_more_pages = False
                     else:
-                        print(f"[ALERTA] Error {response.status_code}: {response.text[:500]}")
+                        print(f"[error] error {response.status_code}: {response.text[:500]}")
                         has_more_pages = False
                         break
                         
                 except Exception as e:
-                    print(f"[ALERTA] ExcepciOn en pagina {page}: {e}")
+                    print(f"[warn] excepcion en pagina {page}: {e}")
                     if attempt < max_retries - 1:
                         time.sleep(5)
                     else:
@@ -637,7 +652,7 @@ def get_data_json_pagoefectivo(token, from_date, to_date):
             # pausa
             time.sleep(1)
 
-        print(f"[INFO] Total registros para {current_date_str}: {len(day_data)}")
+        print(f"[info] total registros para {current_date_str}: {len(day_data)}")
         all_data.extend(day_data)
         current += timedelta(days=1)
         
@@ -745,29 +760,41 @@ def json_excel_pagoefectivo():
 
         print(f"[INFO] Procesado: {file_key} -> {output_key} y movido a {processed_key}")
 
-    print("[✔] Proceso Json -> Excel completado.")
+    print("[ok] Proceso Json -> Excel completado.")
 
 
 def get_data_main_json(from_date, to_date):
+    start_time = time.time()
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso extraccion json pagoefectivo | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*50}\n")
+    
+    success = False
     try:
-        print("[INFO] Iniciando captura de token PagoEfectivo")
+        print("[info] iniciando captura de token pagoefectivo")
         token = asyncio.run(get_token_pagoefectivo())
         if token:
-            print("[INFO] Trayendo datos de PagoEfectivo")
+            print("[info] trayendo datos de pagoefectivo")
             data = get_data_json_pagoefectivo(token, from_date, to_date)
-            print(f"[DEBUG] Datos obtenidos: {data}")
+            # quitamos el log de imprimir todos los datos para no saturar consola y lo ponemos simplificado
+            print(f"[debug] cantidad obtenida en crudo: {data}")
             if data > 0:
-                print("[INFO] Generando archivo Excel")
+                print("[info] generando archivo excel")
                 json_excel_pagoefectivo()
-                return True
+                success = True
             else:
-                print("[ALERTA] No hay datos para procesar.")
-                return False
+                print("[warn] no hay datos para procesar.")
         else:       
-            print("[ALERTA] No se pudo obtener el token de PagoEfectivo.")
-            return False
+            print("[error] no se pudo obtener el token de pagoefectivo.")
+    
     except Exception as e:
-            print(f"[✖] Error en obtener la data de PagoEfectivo: {e}")
-            return False
+            print(f"[error] error en obtener la data de pagoefectivo: {e}")
+
+    elapsed_time = time.time() - start_time
+    print(f"\n{'='*50}")
+    print(f"[fin] proceso pagoefectivo completado")
+    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+    print(f"{'='*50}\n")
+    return success
 
 

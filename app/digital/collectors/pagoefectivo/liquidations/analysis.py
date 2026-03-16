@@ -35,8 +35,6 @@ def get_pagoefectivo_liq(from_date , to_date):
         return False
         
     try:
-
-        s3_client = get_s3_client_with_role()
         
         pagoefectivo_prefix = "digital/collectors/pagoefectivo/liquidations/Pagoefectivo_Aprobados_"
         liquidations_prefix = "digital/collectors/pagoefectivo/liquidations/Pagoefectivo_Liquidaciones_"
@@ -172,22 +170,13 @@ def get_pagoefectivo_liq(from_date , to_date):
                 except Exception as e:
                     print(f"[ALERTA] No se pudo eliminar archivo temporal {ult}: {e}")
 
-        # Mover archivos originales a processed
         new_pagoefectivo_key = pagoefectivo_key.replace('/liquidations/', '/liquidations/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': pagoefectivo_key},
-            Key=new_pagoefectivo_key
-        )
-        delete_file_from_s3(pagoefectivo_key)
+        if copy_file_in_s3(pagoefectivo_key, new_pagoefectivo_key):
+            delete_file_from_s3(pagoefectivo_key)
         
         new_liquidations_key = liquidations_key.replace('/liquidations/', '/liquidations/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': liquidations_key},
-            Key=new_liquidations_key
-        )
-        delete_file_from_s3(liquidations_key)
+        if copy_file_in_s3(liquidations_key, new_liquidations_key):
+            delete_file_from_s3(liquidations_key)
 
         # enviamos el correo
         print(f"[DEBUG] Enviando correo")

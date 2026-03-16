@@ -1,4 +1,5 @@
 import asyncio
+import time
 from playwright.async_api import async_playwright
 import requests
 from datetime import datetime, timedelta
@@ -7,8 +8,6 @@ from app.common.s3_utils import *
 from app.digital.collectors.nuvei.get_qr_2mf.use_secret import main as get_validator_main
 import re
 import os
-
-
 
 # =============================
 #   CACHE DE SESION NUVEI
@@ -25,23 +24,23 @@ class SessionCacheNuvei:
             
             if (not force_refresh and self.session_data and 
                 self.expires_at and now < self.expires_at):
-                print("[INFO] Usando sesion Nuvei del cache")
+                print("[info] usando sesion nuvei del cache")
                 return self.session_data
 
-            print("[INFO] Obteniendo nueva sesion Nuvei...")
+            print("[info] obteniendo nueva sesion nuvei...")
             self.session_data = await get_nuvei_session()
             
             if self.session_data:
-                # Sesion valida por 30 minutos
+                # sesion valida por 30 minutos
                 self.expires_at = now + timedelta(minutes=30)
-                print(f"[INFO] Sesion Nuvei cacheada hasta {self.expires_at}")
+                print(f"[info] sesion nuvei cacheada hasta {self.expires_at}")
             else:
-                print("[ERROR] No se pudo obtener nueva sesion Nuvei")
+                print("[error] no se pudo obtener nueva sesion nuvei")
             
             return self.session_data
 
     def invalidate(self):
-        print("[INFO] Invalidando sesion Nuvei cacheada")
+        print("[info] invalidando sesion nuvei cacheada")
         self.session_data = None
         self.expires_at = None
 
@@ -95,30 +94,30 @@ async def get_nuvei_session():
                 await page.fill('#one_time_password', validator_str)
                 await asyncio.sleep(0.5)
                 await page.keyboard.press("Enter")
-                print("[+] Codigo OTP ingresado correctamente")
+                print("[info] Codigo OTP ingresado correctamente")
             else:
                 print(f"[ERROR] Codigo OTP invalido: {validator_str}")
                 return None
             
-            # Esperar que cargue la pagina despues del OTP
-            print("[INFO] Esperando carga post-OTP")
+            # esperar carga post-otp
+            print("[info] esperando carga post-otp")
             await page.wait_for_timeout(5000)
             
-            # Capturar cookies de sesion
-            print("[INFO] Capturando cookies y CSRF token")
+            # capturar cookies de sesion
+            print("[info] capturando cookies y csrf token")
             cookies = await context.cookies()
             
-            # Capturar CSRF token
+            # capturar csrf token
             csrf_token = await page.evaluate('''() => {
                 const meta = document.querySelector('meta[name="csrf-token"]');
                 return meta ? meta.content : null;
             }''')
             
             if not csrf_token:
-                print("[ERROR] No se pudo obtener CSRF token")
+                print("[error] no se pudo obtener csrf token")
                 return None
             
-            print(f"[SUCCESS] Sesion Nuvei obtenida - CSRF: {csrf_token[:20]}...")
+            print(f"[ok] sesion nuvei obtenida - csrf: {csrf_token[:20]}...")
             
             return {
                 'csrf_token': csrf_token,
@@ -130,19 +129,19 @@ async def get_nuvei_session():
         return None
         
     finally:
-        # Cierre GARANTIZADO de recursos
-        await close_playwright_resources(browser, context, page, "Nuvei")
+        # cierre garantizado de recursos
+        await close_playwright_resources(browser, context, page, "nuvei")
         
         try:
             await p.__aexit__(None, None, None)  
-            print("[DEBUG] Playwright cerrado completamente.")
+            print("[debug] playwright cerrado completamente.")
         except Exception:
             pass
 
 
 
 async def close_playwright_resources(browser, context, page, resource_name=""):
-    print(f"[INFO] Cerrando recursos de {resource_name}...")
+    print(f"[info] cerrando recursos de {resource_name}...")
     cleanup_tasks = []
     
     if page:
@@ -155,9 +154,9 @@ async def close_playwright_resources(browser, context, page, resource_name=""):
     if cleanup_tasks:
         try:
             await asyncio.gather(*cleanup_tasks, return_exceptions=True)
-            print(f"[DEBUG] Recursos de {resource_name} cerrados correctamente")
+            print(f"[debug] recursos de {resource_name} cerrados correctamente")
         except Exception as e:
-            print(f"[WARN] Error cerrando recursos de {resource_name}: {e}")
+            print(f"[warn] error cerrando recursos de {resource_name}: {e}")
 
 
 # =============================
@@ -227,36 +226,36 @@ async def send_export_request(csrf_token, session_cookies, from_date, to_date):
         payload[f"columnsOrder[{idx}]"] = col
 
     try:
-        print(f"[INFO] Enviando solicitud de exportacion para {from_date.strftime('%d/%m/%Y')}")
+        print(f"[info] enviando solicitud de exportacion para {from_date.strftime('%d/%m/%Y')}")
         response = requests.post(url, headers=headers, data=payload, timeout=60000)
         
         if response.status_code == 200:
-            # Buscar el path del archivo en la respuesta
+            # buscar el path del archivo en la respuesta
             response_text = response.text
             path_match = re.search(r'Path: ([^|]+)', response_text)
             if path_match:
                 file_path = path_match.group(1).strip()
-                print(f"[SUCCESS] Solicitud de exportacion enviada exitosamente")
-                print(f"[DEBUG] Archivo generado en: {file_path}")
+                print(f"[ok] solicitud de exportacion enviada exitosamente")
+                print(f"[debug] archivo generado en: {file_path}")
                 return True, file_path
             else:
-                print("[SUCCESS] Solicitud enviada pero no se encontró path del archivo")
+                print("[ok] solicitud enviada pero no se encontro path del archivo")
                 return True, None
         elif response.status_code == 419:
-            print("[WARN] Sesion expirada (419) - Invalidando cache")
+            print("[warn] sesion expirada (419) - invalidando cache")
             session_cache_nuvei.invalidate()
             return False, 419
         elif response.status_code == 401:
-            print("[WARN] No autorizado (401) - Invalidando cache")
+            print("[warn] no autorizado (401) - invalidando cache")
             session_cache_nuvei.invalidate()
             return False, 401
         else:
-            print(f"[ERROR] Status code {response.status_code}")
-            print(f"[DEBUG] Response: {response.text[:500]}")
+            print(f"[error] status code {response.status_code}")
+            print(f"[debug] response: {response.text[:500]}")
             return False, response.status_code
             
     except Exception as e:
-        print(f"[ERROR] Error al enviar solicitud: {e}")
+        print(f"[error] error al enviar solicitud: {e}")
         return False, None
 
 
@@ -280,61 +279,61 @@ def try_download_excel(session_cookies, attempt, file_path=None):
         response = requests.get(url, headers=headers, timeout=60000)
         
         if response.status_code != 200:
-            print(f"[WARN] Intento {attempt}: Status {response.status_code}")
+            print(f"[warn] intento {attempt}: status {response.status_code}")
             return None
         
         content_type = response.headers.get("content-type", "")
         
-        # Si es HTML el archivo no esta listo
+        # si es html el archivo no esta listo
         if "text/html" in content_type:
-            print(f"[WARN] Intento {attempt}: Archivo no listo aun (HTML recibido)")
+            print(f"[warn] intento {attempt}: archivo no listo aun (html recibido)")
             return None
         
-        # Verificar si es Excel valido
+        # verificar si es excel valido
         if not is_valid_excel(response.content):
-            print(f"[WARN] Intento {attempt}: Contenido no es Excel valido")
+            print(f"[warn] intento {attempt}: contenido no es excel valido")
             return None
         
-        # Generar nombre de archivo
+        # generar nombre de archivo
         cd = response.headers.get("content-disposition", "")
         m = re.search(r'filename=([^;]+)', cd)
         filename = m.group(1).strip('"') if m else f"nuvei_export_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
         
-        # Subir a S3
+        # subir a s3
         s3_key = f"digital/collectors/nuvei/input/{filename}"
         upload_file_to_s3(response.content, s3_key)
         
-        print(f"[SUCCESS] Archivo guardado en S3: {s3_key}")
+        print(f"[ok] archivo guardado en s3: {s3_key}")
         return filename
         
     except Exception as e:
-        print(f"[ERROR] Intento {attempt}: {e}")
+        print(f"[error] intento {attempt}: {e}")
         return None
 
 
 async def download_with_retry(session_cookies, file_path=None, max_attempts=30):
     if file_path:
-        print(f"[INFO] Esperando 5 segundos para que se genere el archivo...")
+        print(f"[info] esperando 5 segundos para que se genere el archivo...")
         await asyncio.sleep(5)
     else:
-        print(f"[INFO] Esperando 30 segundos para que se genere el archivo...")
+        print(f"[info] esperando 30 segundos para que se genere el archivo...")
         await asyncio.sleep(30)
     
     for attempt in range(1, max_attempts + 1):
-        print(f"[INFO] Intento de descarga {attempt}/{max_attempts}")
+        print(f"[info] intento de descarga {attempt}/{max_attempts}")
         
         filename = try_download_excel(session_cookies, attempt, file_path)
         
         if filename:
-            print(f"[SUCCESS] Archivo descargado: {filename}")
+            print(f"[ok] archivo descargado: {filename}")
             return filename
         
         if attempt < max_attempts:
             wait_time = 5 if file_path else 10
-            print(f"[INFO] Esperando {wait_time} segundos antes del siguiente intento...")
+            print(f"[info] esperando {wait_time} segundos antes del siguiente intento...")
             await asyncio.sleep(wait_time)
     
-    print(f"[ERROR] No se pudo descargar el archivo despues de {max_attempts} intentos")
+    print(f"[error] no se pudo descargar el archivo despues de {max_attempts} intentos")
     return None
 
 
@@ -342,21 +341,20 @@ async def download_with_retry(session_cookies, file_path=None, max_attempts=30):
 #   FUNCIONES PRINCIPALES 
 # =============================
 async def process_day_download(from_date, to_date, max_retries=5):
-    print(f"[INFO] Procesando fecha: {from_date.strftime('%d/%m/%Y')}")
+    print(f"[info] procesando fecha: {from_date.strftime('%d/%m/%Y')}")
     
     session_data = None
     
     for retry in range(max_retries):
-        # Obtener sesion del cache (forzar refresh despues del primer intento fallido)
         force_refresh = (retry > 0)
-        print(f"[INFO] Obteniendo sesion (intento {retry + 1}/{max_retries}, refresh: {force_refresh})")
+        print(f"[info] obteniendo sesion (intento {retry + 1}/{max_retries}, refresh: {force_refresh})")
         
         session_data = await session_cache_nuvei.get_session(force_refresh=force_refresh)
         
         if not session_data:
-            print("[ERROR] No se pudo obtener sesion")
+            print("[error] no se pudo obtener sesion")
             if retry < max_retries - 1:
-                print("[INFO] Esperando 5 segundos antes de reintentar...")
+                print("[info] esperando 5 segundos antes de reintentar...")
                 await asyncio.sleep(5)
                 continue
             return None
@@ -365,86 +363,94 @@ async def process_day_download(from_date, to_date, max_retries=5):
         session_cookies = session_data.get('cookies')
         
         if not csrf_token or not session_cookies:
-            print("[ERROR] Sesion incompleta - faltan CSRF token o cookies")
+            print("[error] sesion incompleta - faltan csrf token o cookies")
             session_cache_nuvei.invalidate()
             if retry < max_retries - 1:
                 await asyncio.sleep(5)
                 continue
             return None
         
-        # Enviar solicitud de exportacion
         success, result = await send_export_request(csrf_token, session_cookies, from_date, to_date)
         
         if isinstance(result, int) and result in [419, 401]:
-            print(f"[WARN] Sesion expirada ({result}), obteniendo nueva sesion")
+            print(f"[warn] sesion expirada ({result}), obteniendo nueva sesion")
             session_cache_nuvei.invalidate()
             if retry < max_retries - 1:
                 continue
             return None
         
         if not success:
-            print("[ERROR] No se pudo enviar la solicitud de exportacion")
+            print("[error] no se pudo enviar la solicitud de exportacion")
             if retry < max_retries - 1:
                 await asyncio.sleep(5)
                 continue
             return None
         
-        # Intentar descargar el archivo (result puede ser el file_path)
         file_path = result if isinstance(result, str) else None
         filename = await download_with_retry(session_cookies, file_path)
         
         if filename:
-            return filename
+            # devolver path relativo en S3
+            return f"digital/collectors/nuvei/input/{filename}"
         
-        # Si fallo la descarga, reintentar con nueva sesion
-        print(f"[WARN] Descarga fallida, reintentando con nueva sesion ({retry + 2}/{max_retries})")
+        print(f"[warn] descarga fallida, reintentando con nueva sesion ({retry + 2}/{max_retries})")
         session_cache_nuvei.invalidate()
     
     return None
 
 
 async def get_main_download(from_date, to_date):
-    start_date = from_date.replace(hour=0, minute=0, second=0) 
+    # descarga los archivos de nuvei iterando dia por dia dentro del rango
+    start_date = from_date.replace(hour=0, minute=0, second=0)
     end_date = (to_date + timedelta(days=1)).replace(hour=0, minute=0, second=0)
-    
+
+    start_time = time.time()
+
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso nuvei | rango: {start_date.strftime('%Y-%m-%d')} a {(end_date - timedelta(days=1)).strftime('%Y-%m-%d')}")
+    print(f"{'='*50}\n")
+
     current = start_date
-    downloaded_files = []
-    
-    print(f"[INICIO] Procesando descargas Nuvei desde {start_date.strftime('%d/%m/%Y')} hasta {end_date.strftime('%d/%m/%Y')}")
-    
+    downloaded_s3_keys = []
+
     while current < end_date:
         from_d = current
         to_d = current
-        
-        print(f"[INFO] Procesando dia: {from_d.strftime('%d/%m/%Y')}")
-        
-        try:        
-            filename = await process_day_download(from_d, to_d)
-            
-            if filename:
-                print(f"[SUCCESS] Descarga completada: {filename}")
-                downloaded_files.append(filename)
+
+        print(f"[info] procesando dia: {from_d.strftime('%d/%m/%Y')}")
+
+        try:
+            s3_key = await process_day_download(from_d, to_d)
+
+            if s3_key:
+                print(f"[info] descarga completada: {s3_key}")
+                downloaded_s3_keys.append(s3_key)
             else:
-                print(f"[ERROR] No se pudo completar la descarga para {from_d.strftime('%d/%m/%Y')}")
-                # Continuar con el siguiente dia en lugar de retornar None
-                print("[INFO] Continuando con el siguiente dia...")
+                print(f"[error] no se pudo completar la descarga para {from_d.strftime('%d/%m/%Y')}")
+                print("[info] continuando con el siguiente dia...")
 
         except Exception as e:
-            print(f"[ERROR] Error procesando dia {from_d.strftime('%d/%m/%Y')}: {e}")
-            print("[INFO] Continuando con el siguiente dia...")
-        
-        current += timedelta(days=1)
-        
-        # Pequeña pausa entre dias
-        if current < end_date:
-            print("[INFO] Esperando 2 segundos antes del siguiente dia...")
-            await asyncio.sleep(2)
-        
-    if downloaded_files:
-        print(f"[SUCCESS] Procesamiento completado. Total de archivos descargados: {len(downloaded_files)}")
-        return downloaded_files
-    else:
-        print("[ERROR] No se pudo descargar ningun archivo")
-        return None
+            print(f"[error] error procesando dia {from_d.strftime('%d/%m/%Y')}: {e}")
+            print("[info] continuando con el siguiente dia...")
 
+        current += timedelta(days=1)
+
+        # pausa entre dias para evitar saturar el servidor
+        if current < end_date:
+            print("[info] esperando 2 segundos antes del siguiente dia...")
+            await asyncio.sleep(2)
+
+    elapsed_time = time.time() - start_time
+
+    print(f"\n{'='*50}")
+    print(f"[fin] proceso nuvei completado")
+    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+    print(f"{'='*50}\n")
+
+    if downloaded_s3_keys:
+        print(f"[info] finalizado. total de archivos descargados: {len(downloaded_s3_keys)}")
+        return downloaded_s3_keys
+    else:
+        print("[error] no se pudo descargar ningun archivo")
+        return None
 

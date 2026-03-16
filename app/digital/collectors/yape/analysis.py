@@ -1,17 +1,16 @@
 import pandas as pd
 import pytz
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from app.digital.collectors.yape.utils import *
 from app.digital.collectors.yape.email_handler import *
 from app.common.database import *
-from app.common.database import get_dts_session
 from app.common.s3_utils import *
 from app.config import Config
 from app.digital.collectors.calimaco.main import *
 
 
 def get_data_yape(from_date, to_date):
-    s3_client = get_s3_client_with_role()
     try:
         get_data_main_2(from_date, to_date)
     except Exception as e:
@@ -37,12 +36,8 @@ def get_data_yape(from_date, to_date):
                     # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
 
                 except Exception as e:
                     print(f"Error al procesar {s3_key}: {e}")
@@ -64,11 +59,11 @@ def get_data_yape(from_date, to_date):
             return True
         
         else:
-            print("[✖] No se encontraron archivos CSV para consolidar.")
+            print("[error] No se encontraron archivos CSV para consolidar.")
             return False
 
     except Exception as e:
-        print(f"[✖] Error procesando datos yape: {e}")
+        print(f"[error] Error procesando datos yape: {e}")
         return False
 
 
@@ -77,6 +72,11 @@ def get_data_calimaco(from_date, to_date):
         method = 'NIUBIZ_YAPE'
         collector = 'yape'
         calimaco_key = get_main_data(from_date, to_date, method, collector)
+
+        if not calimaco_key:
+            print('[error] no se pudo obtener los datos de calimaco')
+            return False
+            
         calimaco_content = read_file_from_s3(calimaco_key)
 
         df = pd.read_csv(BytesIO(calimaco_content), encoding='utf-8', low_memory=False, dtype={'ID': str, 'Usuario': str, 'ID externo': str})
@@ -101,14 +101,13 @@ def get_data_calimaco(from_date, to_date):
         return True
         
     except Exception as e:
-        print(f"[✖] Error en get_data_calimaco: {e}")
+        print(f"[error] Error en get_data_calimaco: {e}")
         return False
     
 ##comparar de yape Nro Pedido y de calimaco Número de compra
 def conciliation_data(from_date, to_date):
     try:
         # archivos de donde se alimentaran los df
-        s3_client = get_s3_client_with_role()
         calimaco_prefix = "digital/collectors/yape/calimaco/output/Calimaco_Yape_Ventas_"
         yape_prefix = "digital/collectors/yape/output/Yape_Ventas_"
 
@@ -126,8 +125,11 @@ def conciliation_data(from_date, to_date):
         calimaco_content = read_file_from_s3(calimaco_key)
         yape_content = read_file_from_s3(yape_key)
 
-        df1 = pd.read_csv(BytesIO(calimaco_content), dtype={'ID': str, 'Usuario': str, 'ID externo': str})
-        df2 = pd.read_csv(BytesIO(yape_content), dtype={'N°Voucher/Id pedido': str, 'ID operación': str})
+        calimaco_usecols = ["ID", "Fecha", "Fecha de modificación", "Estado", "Usuario", "Cantidad", "ID externo", "Comentarios"]
+        yape_usecols = ["Fecha y hora de Transacción", "N°Voucher/Id pedido", "ID operación", "Monto", "Tipo operación"]
+
+        df1 = pd.read_csv(BytesIO(calimaco_content), low_memory=False, usecols=calimaco_usecols, dtype={'ID': str, 'Usuario': str, 'ID externo': str})
+        df2 = pd.read_csv(BytesIO(yape_content), low_memory=False, usecols=yape_usecols, dtype={'N°Voucher/Id pedido': str, 'ID operación': str})
 
         
         df2 = df2.rename(columns={'Fecha y hora de Transacción':'FECHA'})
@@ -144,12 +146,13 @@ def conciliation_data(from_date, to_date):
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
         df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
         
-        # Insertar datos del collector y Calimaco de forma dual
+        # Iniciar insercion en base de datos en paralelo
         def initial_save(session):
             bulk_upsert_collector_records_optimized(session, df2, 5)  
-            bulk_upsert_calimaco_records_optimized(session, df1, 5) 
-        
-        run_on_dual_dts(initial_save)
+            bulk_upsert_calimaco_records_optimized(session, df1, 5)  
+            
+        executor = ThreadPoolExecutor(max_workers=1)
+        db_future = executor.submit(run_on_dual_dts, initial_save)
         
         cols_calimaco = [
             "ID",
@@ -171,117 +174,89 @@ def conciliation_data(from_date, to_date):
             "ESTADO PROVEEDOR",
         ]
 
-        
-        # Condicion 1
-        df1_cond1 = df1[df1['Estado'].isin(['Denegado', 'Nuevo', 'CANCELLED', 'Límites excedidos' ])]
-        df2_cond1 = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
-        df2_cond1.loc[:, 'ID CALIMACO'] = df2_cond1['ID CALIMACO'].astype(str).str[2:]
-        conciliacion_cond1 = pd.merge(
-        df1_cond1.assign(Numero_compra_temp=df1_cond1['ID'].str[2:]),
-        df2_cond1,
-        # left_on='Numero_compra_temp',
-        # right_on='ID CALIMACO',
-        left_on=['Numero_compra_temp', 'Cantidad'],
-        right_on=['ID CALIMACO', 'MONTO'],
-        how='inner',
-        indicator=False).drop('Numero_compra_temp', axis=1)
+        ## todos los que no son aprobados en calimaco
+        df_no_aprovated_calimaco = df1[df1['Estado'].isin(['Denegado', 'Nuevo', 'CANCELLED', 'Límites excedidos' ])]
+        ## todos los aprobados en calimaco
+        df_aprovated_calimaco = df1[df1['Estado'] == 'Válido']
+        ## todos los aprobados en el recaudador
+        df_aprovated_recaudador = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
 
-        # condicion 2: ambos aprobados
-        df1_cond2 = df1[df1['Estado'] == 'Válido']
-        df2_cond2 = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
-        df2_cond2.loc[:, 'ID CALIMACO'] = df2_cond2['ID CALIMACO'].astype(str).str[2:]
-        conciliacion_cond2 = pd.merge(
-        df1_cond2.assign(Numero_compra_temp=df1_cond2['ID'].str[2:]),
-        df2_cond2,
+        # cambio de estado no aprobados en calimaco vs aprobados en el recaudador
+        df_cambio_estado = pd.merge(
+        df_no_aprovated_calimaco.assign(Numero_compra_temp=df_no_aprovated_calimaco['ID'].str[2:]),
+        df_aprovated_recaudador.assign(ID_CALIMACO_temp=df_aprovated_recaudador['ID CALIMACO'].astype(str).str[2:]),
         left_on=['Numero_compra_temp', 'Cantidad'],
-        right_on=['ID CALIMACO', 'MONTO'],
+        right_on=['ID_CALIMACO_temp', 'MONTO'],
         how='inner',
-        indicator=False).drop('Numero_compra_temp', axis=1)
-        
-        
-        #condicion 3 _ duplicados yape
-        df2_cond3 = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
-        duplicados_df2 = df2_cond3[df2_cond3.duplicated(subset=['ID CALIMACO'], keep=False)]
-        
-        
-        # condicion 4 _ registros aprovados que no hicieron match
-        df1_cond4 = df1[df1['Estado'] == 'Válido']
-        df2_cond4 = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
-        df2_cond4.loc[:, 'ID CALIMACO'] = df2_cond4['ID CALIMACO'].astype(str).str[2:]
-        no_match = pd.merge(
-        df1_cond4.assign(Numero_compra_temp=df1_cond4['ID'].str[2:]),
-        df2_cond4,
-        left_on='Numero_compra_temp',
-        right_on='ID CALIMACO',
-        how='outer',
-        indicator=True).drop('Numero_compra_temp', axis=1)
-        
-        # condicion 5 _ original
-        df2_original = df2.copy()
-        
-        no_match = no_match.rename(columns={'_merge': 'Recaudador Aprobado'})
+        indicator=False).drop(['Numero_compra_temp', 'ID_CALIMACO_temp'], axis=1)
+
+        # conciliados aprobados calimaco vs aprobados recaudador
+        df_conciliados = pd.merge(
+        df_aprovated_calimaco.assign(Numero_compra_temp=df_aprovated_calimaco['ID'].str[2:]),
+        df_aprovated_recaudador.assign(ID_CALIMACO_temp=df_aprovated_recaudador['ID CALIMACO'].astype(str).str[2:]),
+        left_on=['Numero_compra_temp', 'Cantidad'],
+        right_on=['ID_CALIMACO_temp', 'MONTO'],
+        how='inner',
+        indicator=False).drop(['Numero_compra_temp', 'ID_CALIMACO_temp'], axis=1)
+
+        # duplicados_yape
+        df_duplicados = df2[df2.duplicated(subset=["ID CALIMACO"], keep=False)]
+                
+        # registros aprobados en calimaco que NO hicieron match con recaudador        
+        df_no_conciliados = pd.merge(
+            df_aprovated_calimaco.assign(Numero_compra_temp=df_aprovated_calimaco['ID'].str[2:]),
+            df_aprovated_recaudador.assign(ID_CALIMACO_temp=df_aprovated_recaudador['ID CALIMACO'].astype(str).str[2:]),
+            left_on=['Numero_compra_temp', 'Cantidad'],
+            right_on=['ID_CALIMACO_temp', 'MONTO'],
+            how='outer',
+            indicator=True
+        ).drop(['Numero_compra_temp', 'ID_CALIMACO_temp'], axis=1)
+
+        df_no_conciliados = df_no_conciliados.rename(columns={'_merge': 'Recaudador Aprobado'})
         # Cambiar valores
-        no_match['Recaudador Aprobado'] = no_match['Recaudador Aprobado'].cat.rename_categories({
+        df_no_conciliados['Recaudador Aprobado'] = df_no_conciliados['Recaudador Aprobado'].cat.rename_categories({
             'left_only': 'Calimaco Aprobado',
             'right_only': 'Yape Aprobado',
             'both': 'Ambos'
         })
-        # Filtrar solo los que están solo en uno de los dos
-        no_match_filtrado = no_match[no_match['Recaudador Aprobado'].isin(['Calimaco Aprobado', 'Yape Aprobado'])]
+        # Filtrar solo los que estan solo en uno de los dos
+        df_no_conciliados_filtrado = df_no_conciliados[df_no_conciliados['Recaudador Aprobado'].isin(['Calimaco Aprobado', 'Yape Aprobado'])]
         
-        no_conciliados_calimaco = no_match_filtrado[no_match_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado']
-        no_conciliados_calimaco = no_conciliados_calimaco[cols_calimaco]
-        no_conciliados_yape = no_match_filtrado[no_match_filtrado['Recaudador Aprobado'] == 'Yape Aprobado']
-        no_conciliados_yape = no_conciliados_yape[cols_yape]
-        
+        df_nc_calimaco = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado']
+        df_nc_calimaco = df_nc_calimaco[cols_calimaco]
+        df_nc_yape = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Yape Aprobado']
+        df_nc_yape = df_nc_yape[cols_yape]
 
-        current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
-        output_key = f"digital/apps/total-secure/conciliaciones/processed/Yape_Conciliacion_Ventas_{current_time}.csv"
-        
+        # guardar resultado en s3
+        current_time = datetime.now(pytz.timezone("America/Lima")).strftime("%Y%m%d%H%M%S")
+        output_key = f"digital/apps/total-secure/conciliaciones/processed/Yape_Conciliacion_Ventas_{current_time}.xlsx"
+
         with BytesIO() as buffer:
-            conciliacion_cond2.to_csv(buffer, index=False)
+            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                df_conciliados.to_excel(writer, sheet_name="Operaciones Conciliadas", index=False)
+                df_nc_calimaco.to_excel(writer, sheet_name="No Conciliados Calimaco", index=False)
+                df_nc_yape.to_excel(writer, sheet_name="No Conciliados Proveedor", index=False)
+                df_duplicados.to_excel(writer, sheet_name="Operaciones Duplicadas", index=False)
+                df_cambio_estado.to_excel(writer, sheet_name="Cambios de Estado", index=False)
+                df_aprovated_recaudador.to_excel(writer, sheet_name="Proveedor Original", index=False)
             buffer.seek(0)
             upload_file_to_s3(buffer.getvalue(), output_key)
-        
-        output_key_re = f"digital/apps/total-secure/conciliaciones/processed/Yape_Conciliacion_Ventas_{current_time}.xlsx"
-        
-        with BytesIO() as buffer:
-            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                save_dfs_to_excel(writer, {
-                    "Operaciones Conciliadas": conciliacion_cond2,
-                    "No Conciliados Calimaco": no_conciliados_calimaco,
-                    "No Conciliados Proveedor": no_conciliados_yape,
-                    "Operaciones Duplicadas": duplicados_df2,
-                    "Cambios de Estado": conciliacion_cond1,
-                    "Proveedor Original": df2_original
-                })
-            buffer.seek(0)
-            upload_file_to_s3(buffer.getvalue(), output_key_re)
 
-        
-        conciliacion_content = read_file_from_s3(output_key)
-        conciliadas_df = pd.read_csv(BytesIO(conciliacion_content), encoding='utf-8', low_memory=False)
-        
-        approvals_df_calimaco = df1[df1['Estado'] == 'Válido']
-        # approvals_df_yape = df2[df2['ESTADO PROVEEDOR'].isin (['Depositada'])]
-        approvals_df_yape = df2[df2['ESTADO PROVEEDOR'].isin(['Venta'])]
-
-                
 
         metricas = {
             "total_calimaco": len(df1),
             "total_yape": len(df2),
-            "aprobados_calimaco": len(approvals_df_calimaco),
-            "aprobados_yape": len(approvals_df_yape),
-            "recaudacion_calimaco": round(approvals_df_calimaco['Cantidad'].sum(), 2),
-            "recaudacion_yape": round(approvals_df_yape['MONTO'].sum(), 2),
-            "conciliados_total": len(conciliadas_df),
-            "conciliados_monto_calimaco": round(conciliadas_df["Cantidad"].sum(), 2),
-            "conciliados_monto_yape": round(conciliadas_df["MONTO"].sum(), 2),
-            "no_conciliados_calimaco": len(no_conciliados_calimaco),
-            "no_conciliados_yape": len(no_conciliados_yape),
-            "no_conciliados_monto_calimaco": round(no_conciliados_calimaco["Cantidad"].sum(), 2),
-            "no_conciliados_monto_yape": round(no_conciliados_yape["MONTO"].sum(), 2)
+            "aprobados_calimaco": len(df_aprovated_calimaco),
+            "aprobados_yape": len(df_aprovated_recaudador),
+            "recaudacion_calimaco": round(df_aprovated_calimaco["Cantidad"].sum(), 2),
+            "recaudacion_yape": round(df_aprovated_recaudador["MONTO"].sum(), 2),
+            "conciliados_total": len(df_conciliados),
+            "conciliados_monto_calimaco": round(df_conciliados["Cantidad"].sum(), 2),
+            "conciliados_monto_yape": round(df_conciliados["MONTO"].sum(), 2),
+            "no_conciliados_calimaco": len(df_nc_calimaco),
+            "no_conciliados_yape": len(df_nc_yape),
+            "no_conciliados_monto_calimaco": round(df_nc_calimaco["Cantidad"].sum(), 2),
+            "no_conciliados_monto_yape": round(df_nc_yape["MONTO"].sum(), 2)
         }
         
         print("Datos obtenidos:")
@@ -290,28 +265,18 @@ def conciliation_data(from_date, to_date):
 
 
         # Mover archivos y obtener las rutas finales
-        # Yape
         new_yape_key = yape_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': yape_key},
-            Key=new_yape_key
-        )
-        delete_file_from_s3(yape_key)
+        if copy_file_in_s3(yape_key, new_yape_key):
+            delete_file_from_s3(yape_key)
 
-        # Calimaco
         new_calimaco_key = calimaco_key.replace('/output/', '/output/processed/', 1)
-        s3_client.copy_object(
-            Bucket=Config.S3_BUCKET,
-            CopySource={'Bucket': Config.S3_BUCKET, 'Key': calimaco_key},
-            Key=new_calimaco_key
-        )
-        delete_file_from_s3(calimaco_key)
+        if copy_file_in_s3(calimaco_key, new_calimaco_key):
+            delete_file_from_s3(calimaco_key)
         
         # Enviamos el correo con los adjuntos
         print("[INFO] enviando correo con resultados")
         period_email = f"{from_date.strftime("%Y/%m/%d")} - {to_date.strftime("%Y/%m/%d")}"
-        send_email_with_results(output_key_re, metricas, period_email)    
+        send_email_with_results(output_key, metricas, period_email)    
         
         
 
@@ -345,18 +310,18 @@ def conciliation_data(from_date, to_date):
             insert_conciliation_files(
                 session, conciliation_id, 1, f"s3://{Config.S3_BUCKET}/{output_key}"
             )
-            insert_conciliation_files(
-                session, conciliation_id, 2, f"s3://{Config.S3_BUCKET}/{output_key_re}"
-            )
             session.commit()
 
         run_on_dual_dts(final_save)
+        
+        # Asegurar que la insercion inicial termino
+        db_future.result()
                 
         print(f"[SUCCESS] Conciliacion completada exitosamente: {output_key}")
         return True
         
     except Exception as e:
-        print(f"[✖] Error en conciliation_data para yape: {e}")
+        print(f"[error] Error en conciliation_data para yape: {e}")
         return False
         
         
@@ -405,17 +370,21 @@ def updated_data_yape():
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
         df2 = df2.drop_duplicates(subset=['ID CALIMACO'], keep='first')
         
-        # insertar datos y actualizar timestamp de forma dual
+        # Iniciar actualizacion en base de datos en paralelo
         def update_save(session):
             bulk_upsert_collector_records_optimized(session, df2, 5) 
             bulk_upsert_calimaco_records_optimized(session, df1, 5)  
             update_collector_timestamp(session, 5) 
 
-        run_on_dual_dts(update_save)
-
-        # eliminar archivos procesados
+        executor = ThreadPoolExecutor(max_workers=1)
+        db_future = executor.submit(run_on_dual_dts, update_save)
+        
+        # Eliminar archivos procesados inmediatamente mientras la DB trabaja
         delete_file_from_s3(yape_key)
         delete_file_from_s3(calimaco_key)
+        
+        # Esperar a que la DB termine
+        db_future.result()
         
         print("[SUCCESS] Proceso exitoso para la actualizacion de Yape")
         return True
@@ -426,7 +395,6 @@ def updated_data_yape():
 
 
 def get_data_yape_1(from_date, to_date):
-    s3_client = get_s3_client_with_role()
     try:
         get_data_main_json(from_date, to_date)
     except Exception as e:
@@ -452,12 +420,8 @@ def get_data_yape_1(from_date, to_date):
                     # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
 
                 except Exception as e:
                     print(f"Error al procesar {s3_key}: {e}")
@@ -479,13 +443,11 @@ def get_data_yape_1(from_date, to_date):
             return True
         
         else:
-            print("[✖] No se encontraron archivos CSV para consolidar.")
+            print("[error] No se encontraron archivos CSV para consolidar.")
             return False
 
     except Exception as e:
-        print(f"[✖] Error procesando datos yape: {e}")
+        print(f"[error] Error procesando datos yape: {e}")
         return False
 
 
-if __name__ == "__main__":
-    updated_data_yape()

@@ -115,7 +115,6 @@ def insert_incidents(session, case_id, group):
         client_id = result.scalar()
 
         # insertar incidente
-        ##safe_dict = convert_row_to_json_safe_dict(row)
         safe_dict = convert_row_to_json_safe_dict_exclude(row, exclude_cols)
         incident = TblCaseIncident(
             case_id=case_id,

@@ -2,10 +2,10 @@ from datetime import datetime
 import pytz
 import os
 from app.config import Config
-from app.common.mail import send_mail, sendMailOffice365
+from app.common.mail import send_mail_office_365
 
 def send_email_with_results(df, total_dni, output_dir):
-    """Envia un correo con los resultados del analisis"""
+    """envia un correo con los resultados del analisis"""
     current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d_%H%M') + '00'
     
     # generar archivo csv
@@ -21,7 +21,7 @@ def send_email_with_results(df, total_dni, output_dir):
 
     # construir mensaje
     subject = f'DNI Correlativos {current_time}'
-    recipients = Config.CORREO_DNICORRELATIVOS.split(',')
+    recipients = Config.EMAIL_DNI_CORRELATIVES.split(',')
     mensaje_html = f"""
         <!DOCTYPE html>
         <html>
@@ -34,7 +34,7 @@ def send_email_with_results(df, total_dni, output_dir):
                 <tr>
                     <td align="center" style="padding: 20px;">
                         <h1 style="color: #FFFFFF; margin: 0; font-size: 24px;">Reporte de DNI Correlativos</h1>
-                        <p style="color: #FFFFFF; margin: 10px 0 0;">Detección de posibles actividades inusuales - Últimas 48 horas</p>
+                        <p style="color: #FFFFFF; margin: 10px 0 0;">DetecciÃ³n de posibles actividades inusuales - Ãšltimas 48 horas</p>
                     </td>
                 </tr>
             </table>
@@ -43,19 +43,19 @@ def send_email_with_results(df, total_dni, output_dir):
             <table width="100%" cellpadding="25" cellspacing="0" bgcolor="#FFFFFF" style="border: 1px solid #e0e0e0; border-top: none;">
                 <tr>
                     <td>
-                        <!-- Introducción -->
+                        <!-- IntroducciÃ³n -->
                         <table width="100%" cellpadding="0" cellspacing="0">
                             <tr>
                                 <td style="padding-bottom: 20px;">
                                     <p style="margin: 0; color: #000000; line-height: 1.6;">
-                                        Se envía la información de DNI correlativos de los registros de las últimas 48 horas,
-                                        detectando posibles patrones inusuales que requieren atención y verificación.
+                                        Se envÃ­a la informaciÃ³n de DNI correlativos de los registros de las Ãºltimas 48 horas,
+                                        detectando posibles patrones inusuales que requieren atenciÃ³n y verificaciÃ³n.
                                     </p>
                                 </td>
                             </tr>
                         </table>
                         
-                        <!-- Estadísticas principales -->
+                        <!-- EstadÃ­sticas principales -->
                         <table width="100%" cellpadding="0" cellspacing="0">
                             <tr>
                                 <td width="33%" valign="top" style="padding: 0 10px;">
@@ -92,14 +92,14 @@ def send_email_with_results(df, total_dni, output_dir):
                             </tr>
                         </table>
                         
-                        <!-- Información adicional -->
+                        <!-- InformaciÃ³n adicional -->
                         <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px;">
                             <tr>
                                 <td style="background-color: #f8f9fa; border-left: 4px solid #FF0000; border-radius: 4px; padding: 15px;">
                                     <h3 style="color: #FF0000; margin-top: 0;">Resumen del Reporte</h3>
                                     <p style="color: #000000; margin: 10px 0; line-height: 1.5;">
                                         Este reporte incluye un archivo CSV adjunto con el detalle completo de los 
-                                        DNI correlativos detectados en el período de 48 horas para su análisis detallado.
+                                        DNI correlativos detectados en el perÃ­odo de 48 horas para su anÃ¡lisis detallado.
                                     </p>
                                 </td>
                             </tr>
@@ -111,20 +111,20 @@ def send_email_with_results(df, total_dni, output_dir):
                                 <td style="background-color: #fff8f8; border-left: 4px solid #FF0000; border-radius: 4px; padding: 15px;">
                                     <h3 style="color: #FF0000; margin-top: 0;">Acciones Recomendadas</h3>
                                     <ul style="color: #000000; margin: 10px 0; padding-left: 20px;">
-                                        <li>Verificar la legitimidad de los DNI con mayor número de registros</li>
-                                        <li>Analizar posibles intentos de suplantación de identidad</li>
+                                        <li>Verificar la legitimidad de los DNI con mayor nÃºmero de registros</li>
+                                        <li>Analizar posibles intentos de suplantaciÃ³n de identidad</li>
                                         <li>Revisar patrones de comportamiento inusual en las transacciones</li>
                                     </ul>
                                 </td>
                             </tr>
                         </table>
                         
-                        <!-- Pie de página -->
+                        <!-- Pie de pÃ¡gina -->
                         <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px;">
                             <tr>
                                 <td align="center" style="padding-top: 20px; color: #666666; font-size: 12px; border-top: 1px solid #e0e0e0;">
-                                    <p>Reporte generado automáticamente - {hora_actual}</p>
-                                    <p style="margin: 10px 0 0; font-size: 12px; color: #666;">Prevención de Fraude - Optimización Operativa<br>© {anio_actual}</p>
+                                    <p>Reporte generado automÃ¡ticamente - {hora_actual}</p>
+                                    <p style="margin: 10px 0 0; font-size: 12px; color: #666;">PrevenciÃ³n de Fraude - OptimizaciÃ³n Operativa<br>Â© {anio_actual}</p>
                                 </td>
                             </tr>
                         </table>
@@ -136,20 +136,18 @@ def send_email_with_results(df, total_dni, output_dir):
     """
     
     # enviar correo
-    # send_mail(subject, mensaje_html, recipients, [csv_file_path])
-    sendMailOffice365(Config.SMTP_USER, subject, mensaje_html, recipients, [csv_file_path])
+    send_mail_office_365(Config.SMTP_USER, subject, mensaje_html, recipients, [csv_file_path])
     
     
 def send_empty_results_email(total_dni):
     """envia un correo cuando no hay resultados"""
     current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d_%H%M') + '00'
     subject = f'DNI Correlativos {current_time}'
-    recipients = Config.CORREO_DNICORRELATIVOS.split(',')
+    recipients = Config.EMAIL_DNI_CORRELATIVES.split(',')
     mensaje_html = f"""
         <html><body>
         <p>No se encontraron DNI correlativos en las ultimas 48 horas.</p>
         <p>Total de registros analizados: {total_dni}</p>
         </body></html>
     """
-    # send_mail(subject, mensaje_html, recipients)
-    sendMailOffice365(Config.SMTP_USER, subject, mensaje_html, recipients)
+    send_mail_office_365(Config.SMTP_USER, subject, mensaje_html, recipients)

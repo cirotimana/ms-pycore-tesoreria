@@ -52,10 +52,10 @@ async def get_id_async(bearer, from_date, to_date):
             print(f"[INFO] Services encontradas: {service}")
             return idtransfer, service
         else:
-            print(f"[✖] Error {response.status_code}: {response.text}")
+            print(f"[error] Error {response.status_code}: {response.text}")
             return [], []
     except Exception as e:
-        print(f"[✖] Excepcion durante la llamada: {e}")
+        print(f"[error] Excepcion durante la llamada: {e}")
         return [], []
 
 async def get_request_download_async(bearer, idtransfer, service):
@@ -81,10 +81,10 @@ async def get_request_download_async(bearer, idtransfer, service):
             print(f"[INFO] Se envio solicitud del idtransfer: {idtransfer} - servicio {service}")
             return True
         else:
-            print(f"[✖] Error {response.status_code}: {response.text}")
+            print(f"[error] Error {response.status_code}: {response.text}")
             return False
     except Exception as e:
-        print(f"[✖] Excepcion durante la llamada: {e}")
+        print(f"[error] Excepcion durante la llamada: {e}")
         return False
 
 async def get_routes_liq_async(bearer, target_ids, from_d, to_d, max_attempts=25, wait_seconds=60):
@@ -156,10 +156,10 @@ async def get_routes_liq_async(bearer, target_ids, from_d, to_d, max_attempts=25
                         await asyncio.sleep(wait_seconds)
                     
             else:
-                print(f"[✖] Error {response.status_code}: {response.text}")
+                print(f"[error] Error {response.status_code}: {response.text}")
                 
         except Exception as e:
-            print(f"[✖] Excepcion durante la llamada: {e}")
+            print(f"[error] Excepcion durante la llamada: {e}")
     
     rutas = []
     referencias = []
@@ -209,17 +209,17 @@ async def get_download_files_async(bearer, id_reporte, referencia, nombre_archiv
                         upload_file_to_s3(buffer.getvalue(), output_key)
                     return output_key
                 else:
-                    print(f"[✖] Error al descargar archivo real: {file_resp.status_code}")
+                    print(f"[error] Error al descargar archivo real: {file_resp.status_code}")
                     return None
             else:
                 print(f"Respuesta inesperada: {response_text}")
                 return None
             
         else:
-            print(f"[✖] Error {response.status_code}: {response.text}")
+            print(f"[error] Error {response.status_code}: {response.text}")
             return None
     except Exception as e:
-        print(f"[✖] Excepcion durante la llamada: {e}")
+        print(f"[error] Excepcion durante la llamada: {e}")
         return None
 
 async def get_data_liq_async(bearer, from_date, to_date):
@@ -312,7 +312,6 @@ async def process_s3_files_async(from_date_str, to_date_str):
     s3_files = list_files_in_s3(s3_prefix)
     
     dataframes = []
-    s3_client = get_s3_client_with_role()
     
     columnas = [
         'SN1', 'SN2', 'CIP', 'IdComercio', 'SN3', 'Comisión', 'Total', 
@@ -358,12 +357,8 @@ async def process_s3_files_async(from_date_str, to_date_str):
                 # Mover a processed
                 if '/processed/' not in s3_key:
                     new_key = s3_key.replace('/liquidations/', '/liquidations/processed/', 1)
-                    s3_client.copy_object(
-                        Bucket=Config.S3_BUCKET,
-                        CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                        Key=new_key
-                    )
-                    delete_file_from_s3(s3_key)
+                    if copy_file_in_s3(s3_key, new_key):
+                        delete_file_from_s3(s3_key)
                 
             except Exception as e:
                 print(f"[ERROR] Error al procesar {s3_key}: {e}")
@@ -441,7 +436,6 @@ def get_data_join(from_date, to_date):
         
         
 def get_data_pagoefectivo(from_date, to_date):
-    s3_client = get_s3_client_with_role()
     try:
         # get_main_pagoefectivo(from_date, to_date)
         get_main_pagoefectivo(from_date, to_date)
@@ -468,15 +462,11 @@ def get_data_pagoefectivo(from_date, to_date):
                     # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
                     
                 except Exception as e:
-                    print(f"[✖] Error al procesar {s3_key}: {e}")
+                    print(f"[error] Error al procesar {s3_key}: {e}")
                     
             elif s3_key.endswith('.csv') and '/input/processed/' not in s3_key:
                 try:
@@ -498,15 +488,11 @@ def get_data_pagoefectivo(from_date, to_date):
                     # Mover a processed
                     if '/input/' in s3_key and '/input/processed/' not in s3_key:
                         new_key = s3_key.replace('/input/', '/input/processed/', 1)
-                        s3_client.copy_object(
-                            Bucket=Config.S3_BUCKET,
-                            CopySource={'Bucket': Config.S3_BUCKET, 'Key': s3_key},
-                            Key=new_key
-                        )
-                        delete_file_from_s3(s3_key)
+                        if copy_file_in_s3(s3_key, new_key):
+                            delete_file_from_s3(s3_key)
                     
                 except Exception as e:
-                    print(f"[✖] Error al procesar {s3_key}: {e}")
+                    print(f"[error] Error al procesar {s3_key}: {e}")
 
         if dataframes:
             consolidated_df = pd.concat(dataframes, ignore_index=True)
@@ -573,11 +559,11 @@ def get_data_pagoefectivo(from_date, to_date):
             print(f"[SUCCESS] Pagoefectivo-liq-apr procesado exitosamente: {output_key}")
             return True
         else:
-            print("[✖] No se encontraron archivos Excel para consolidar.")
+            print("[error] No se encontraron archivos Excel para consolidar.")
             return False
 
     except Exception as e:
-        print(f"[✖] Error procesando datos Pagoefectivo: {e}")
+        print(f"[error] Error procesando datos Pagoefectivo: {e}")
         return False
         
         

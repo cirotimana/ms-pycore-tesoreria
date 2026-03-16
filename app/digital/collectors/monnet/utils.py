@@ -5,6 +5,7 @@ import requests
 from datetime import datetime, timedelta
 import json
 import pytz
+import time
 from app.config import Config
 from io import BytesIO
 from app.common.s3_utils import *
@@ -26,23 +27,23 @@ class TokenCacheMonnet:
             
             if (not force_refresh and self.token and 
                 self.expires_at and now < self.expires_at):
-                print("[INFO] Usando token Monnet del cache")
+                print("[info] usando token monnet del cache")
                 return self.token
 
-            print("[INFO] Obteniendo nuevo token Monnet...")
+            print("[info] obteniendo nuevo token monnet...")
             self.token = await get_token_monnet()
             
             if self.token:
-                # Token valido por 30 minutos
+                # token valido por 30 minutos
                 self.expires_at = now + timedelta(minutes=30)
-                print(f"[INFO] Token Monnet cacheado hasta {self.expires_at}")
+                print(f"[info] token monnet cacheado hasta {self.expires_at}")
             else:
-                print("[ERROR] No se pudo obtener nuevo token Monnet")
+                print("[error] no se pudo obtener nuevo token monnet")
             
             return self.token
 
     def invalidate(self):
-        print("[INFO] Invalidando token Monnet cacheado")
+        print("[info] invalidando token monnet cacheado")
         self.token = None
         self.expires_at = None
 
@@ -61,16 +62,16 @@ async def get_token_monnet():
     
     try:
         async with async_playwright() as p:
-            print("[INFO] Lanzando navegador para Monnet")
+            print("[info] lanzando navegador para monnet")
             browser = await p.chromium.launch(
                 headless=True,
                 args=[
-                        "--no-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                        "--no-zygote",
-                        "--single-process",
-                    ]
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage", 
+                    "--disable-gpu",
+                    "--no-zygote",
+                    "--single-process",
+                ]
             )
             
             context = await browser.new_context(
@@ -91,25 +92,25 @@ async def get_token_monnet():
                 headers = request.headers
                 if 'authorization' in headers and not token_found:
                     token_found = headers['authorization']
-                    print(f"[DEBUG] Token capturado: {token_found[:20]}...")
+                    print(f"[debug] token capturado: {token_found[:20]}...")
                 await route.continue_()
 
             await context.route("**", handle_request)
 
-            print("[INFO] Navegando a Monnet")
+            print("[info] navegando a monnet")
             await page.goto("https://payin.monnetpayments.com/pages/auth/login", wait_until="networkidle", timeout=60000)
 
-            # Login
-            print("[INFO] Realizando login")
+            # login
+            print("[info] realizando login")
             await page.fill('input[name="username"], input[type="email"]', Config.USER_NAME_MONNET)
             await page.fill('input[name="password"]', Config.PASSWORD_MONNET)
             await page.click('button[type="submit"], #kc-login')
 
-            # Esperar a que se cargue el contenido
-            print("[INFO] Esperando carga post-login")
+            # esperar a que se cargue el contenido
+            print("[info] esperando carga post-login")
             await page.wait_for_selector("label", timeout=10000)
 
-            # Buscar el label que contiene el texto del usuario
+            # buscar el label que contiene el texto del usuario
             labels = await page.query_selector_all("label")
             checkbox_found = False
             user = Config.USER_NAME_MONNET
@@ -117,51 +118,51 @@ async def get_token_monnet():
             for label in labels:
                 label_text = (await label.inner_text()).strip().lower()
                 if user in label_text:
-                    print(f"[INFO] Label encontrado para '{user}'")
+                    print(f"[info] label encontrado para '{user}'")
                     await label.click(force=True)
                     checkbox_found = True
-                    print("[INFO] Label clickeado exitosamente")
+                    print("[info] label clickeado exitosamente")
                     break
 
             if not checkbox_found:
-                print(f"[WARN] No se encontro el label para '{user}'")
+                print(f"[warn] no se encontro el label para '{user}'")
 
-            # Esperar inputs OTP
-            print("[INFO] Esperando campo OTP")
+            # esperar inputs otp
+            print("[info] esperando campo otp")
             await page.wait_for_selector('#otp-group input[type="text"]', timeout=10000)
             
             validator = get_validator_main()
             validator_str = str(validator).strip()
             
             if len(validator_str) == 6 and validator_str.isdigit():
-                print(f"[INFO] Ingresando codigo OTP: {validator_str}")
+                print(f"[info] ingresando codigo otp: {validator_str}")
                 for i, digit in enumerate(validator_str, start=1):
                     await page.fill(f'#otp{i}', digit)
                     await asyncio.sleep(0.5)
                 await asyncio.sleep(1)
                 await page.keyboard.press("Enter")
-                print("[INFO] Codigo OTP ingresado y Enter enviado")
+                print("[info] codigo otp ingresado y enter enviado")
             else:
-                print(f"[ERROR] Codigo OTP invalido: {validator_str}")
+                print(f"[error] codigo otp invalido: {validator_str}")
                 return None
 
-            # Esperar captura del token
-            print("[INFO] Esperando captura del token (60s max)")
+            # esperar captura del token
+            print("[info] esperando captura del token (60s max)")
             for i in range(60):
                 if token_found:
-                    print(f"[SUCCESS] Token capturado en segundo {i + 1}")
+                    print(f"[ok] token capturado en segundo {i + 1}")
                     break
                 await asyncio.sleep(1)
 
             if token_found:
-                print("[INFO] Token capturado exitosamente")
+                print("[info] token capturado exitosamente")
                 return token_found
             else:
-                print("[ERROR] No se encontro token despues de 60 segundos")
+                print("[error] no se encontro token despues de 60 segundos")
                 return None
                 
     except Exception as e:
-        print(f"[ERROR] Error general en get_token_monnet: {e}")
+        print(f"[error] error general en get_token_monnet: {e}")
         return None
         
     finally:
@@ -176,7 +177,7 @@ async def get_token_monnet():
 
 
 async def close_playwright_resources_monnet(browser, context, page):
-    print("[INFO] Cerrando recursos de Monnet...")
+    print("[info] cerrando recursos de monnet...")
     cleanup_tasks = []
     
     if page:
@@ -189,105 +190,21 @@ async def close_playwright_resources_monnet(browser, context, page):
     if cleanup_tasks:
         try:
             await asyncio.gather(*cleanup_tasks, return_exceptions=True)
-            print("[DEBUG] Recursos de Monnet cerrados correctamente")
+            print("[debug] recursos de monnet cerrados correctamente")
         except Exception as e:
-            print(f"[WARN] Error cerrando recursos de Monnet: {e}")
+            print(f"[warn] error cerrando recursos de monnet: {e}")
 
 
 # =============================
 #   FUNCIONES DE DATOS
 # =============================
-# async def get_data_json_monnet_async(token, from_date, to_date):
-#     print(f"[INFO] Descargando transacciones del: {from_date.strftime('%Y-%m-%d')} al {to_date.strftime('%Y-%m-%d')}")
-
-#     headers = {
-#         "Accept": "application/json",
-#         "Content-Type": "application/json",
-#         "Authorization": token
-#     }
-
-#     url = "https://apiin.monnetpayments.com/ms-experience-front/operation-return/api/report/transaction-report?isFilPaymentDate=0"
-
-#     from_d = from_date.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
-#     to_d = to_date.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
-
-#     body = {
-#         "filters": {
-#             "startDate": from_d,
-#             "endDate": to_d,
-#             "merchantIds": [226],
-#             "page": 0,
-#             "size": 1000000,
-#             "chargeBack": None
-#         }
-#     }
-
-#     print(f"[INFO] Descargando transacciones del {from_d} al {to_d}")
-
-#     max_retries = 3
-#     current_token = token
-    
-#     for retry in range(max_retries):
-#         try:
-#             response = requests.post(url, headers=headers, json=body, timeout=180)  # Timeout aumentado
-            
-#             if response.status_code == 200:
-#                 current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
-#                 file_key = f"digital/collectors/monnet/input/response_{current_time}.json"
-                
-#                 # Validar que la respuesta contenga datos
-#                 try:
-#                     response_data = response.json()
-#                     if isinstance(response_data, dict) and response_data.get("data"):
-#                         data_count = len(response_data["data"])
-#                         print(f"[INFO] Datos recibidos: {data_count} registros")
-#                     else:
-#                         print("[WARN] Respuesta no contiene datos esperados")
-#                 except:
-#                     print("[INFO] No se pudo parsear JSON de respuesta, guardando contenido crudo")
-                
-#                 upload_file_to_s3(response.content, file_key)
-#                 print(f"[SUCCESS] Archivo guardado en S3: {file_key}")
-#                 return len(response.content), current_token
-                
-#             elif response.status_code in [401, 403]:
-#                 print(f"[ERROR] Error de autorizacion {response.status_code}")
-#                 if retry < max_retries - 1:
-#                     new_token = await token_cache_monnet.get_token(force_refresh=True)
-#                     if new_token:
-#                         current_token = new_token
-#                         headers["Authorization"] = current_token
-#                         print("[INFO] Token renovado para descarga")
-#                     else:
-#                         print("[ERROR] No se pudo renovar token")
-#                 break
-                
-#             else:
-#                 print(f"[ERROR] Status {response.status_code}: {response.text[:200]}")
-#                 if retry < max_retries - 1:
-#                     print(f"[INFO] Reintentando en 5 segundos...")
-#                     await asyncio.sleep(5)
-#                 else:
-#                     break
-                    
-#         except requests.exceptions.Timeout:
-#             print(f"[ERROR] Timeout en la solicitud, reintento {retry + 1}")
-#             if retry < max_retries - 1:
-#                 await asyncio.sleep(5)
-#             else:
-#                 break
-                
-#         except Exception as e:
-#             print(f"[ERROR] Excepcion durante descarga: {e}")
-#             if retry < max_retries - 1:
-#                 await asyncio.sleep(5)
-#             else:
-#                 break
-    
-#     return None, current_token
 
 async def get_data_json_monnet_async(token, from_date, to_date):
-    print(f"[INFO] Descargando transacciones del: {from_date.strftime('%Y-%m-%d')} al {to_date.strftime('%Y-%m-%d')}")
+    # descarga el rango completo en una sola solicitud con paginacion grande
+    from_d = from_date.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
+    to_d = to_date.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
+
+    print(f"[info] descargando rango completo desde {from_d} hasta {to_d}")
 
     headers = {
         "Accept": "application/json",
@@ -296,9 +213,6 @@ async def get_data_json_monnet_async(token, from_date, to_date):
     }
 
     url = "https://apiin.monnetpayments.com/ms-experience-front/operation-return/api/report/transaction-report?isFilPaymentDate=0"
-
-    from_d = from_date.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
-    to_d = to_date.replace(hour=0, minute=0, second=0).strftime("%Y-%m-%d %H:%M:%S")
 
     body = {
         "filters": {
@@ -311,7 +225,7 @@ async def get_data_json_monnet_async(token, from_date, to_date):
         }
     }
 
-    print(f"[INFO] Descargando transacciones del {from_d} al {to_d}")
+    print(f"[info] payload: desde {from_d} hasta {to_d}")
 
     max_retries = 3
     current_token = token
@@ -321,82 +235,82 @@ async def get_data_json_monnet_async(token, from_date, to_date):
             response = requests.post(url, headers=headers, json=body, timeout=180)
             
             if response.status_code == 200:
-                # Validar SI la respuesta contiene datos reales
+                # validar SI la respuesta contiene datos reales
                 try:
                     response_data = response.json()
                     
-                    # Detectar si es un error de autenticacion
+                    # detectar si es un error de autenticacion
                     if isinstance(response_data, dict):
-                        if response_data.get("codigo") == "41":  # Error de autenticacion
-                            print(f"[ERROR] Autenticacion fallida: {response_data.get('mensaje')}")
+                        if response_data.get("codigo") == "41":  # error de autenticacion
+                            print(f"[error] autenticacion fallida: {response_data.get('mensaje')}")
                             if retry < max_retries - 1:
-                                print("[INFO] Token invalido, renovando...")
+                                print("[info] token invalido, renovando...")
                                 new_token = await token_cache_monnet.get_token(force_refresh=True)
                                 if new_token:
                                     current_token = new_token
                                     headers["Authorization"] = new_token
-                                    print("[INFO] Token renovado, reintentando...")
-                                    continue  # Reintentar con nuevo token
+                                    print("[info] token renovado, reintentando...")
+                                    continue  # reintentar con nuevo token
                                 else:
-                                    print("[ERROR] No se pudo renovar el token")
+                                    print("[error] no se pudo renovar el token")
                                     break
                             else:
-                                print("[ERROR] Maximos reintentos de autenticacion alcanzados")
+                                print("[error] maximos reintentos de autenticacion alcanzados")
                                 break
                         
-                        # Si contiene datos reales
+                        # si contiene datos reales
                         elif response_data.get("data") is not None:
                             data_count = len(response_data["data"]) if isinstance(response_data["data"], list) else 0
-                            print(f"[INFO] Datos recibidos: {data_count} registros")
+                            print(f"[info] datos recibidos: {data_count} registros")
                             
                             current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
                             file_key = f"digital/collectors/monnet/input/response_{current_time}.json"
                             upload_file_to_s3(response.content, file_key)
-                            print(f"[SUCCESS] Archivo guardado en S3: {file_key}")
+                            print(f"[ok] archivo guardado en s3: {file_key}")
                             return data_count, current_token
                         
                         else:
-                            print(f"[WARN] Respuesta no contiene datos: {response_data}")
+                            print(f"[warn] respuesta no contiene datos: {response_data}")
                             return 0, current_token
                     
                 except json.JSONDecodeError:
-                    print("[ERROR] No se pudo decodificar la respuesta JSON")
-                    # Guardar respuesta cruda para debugging
+                    print("[error] no se pudo decodificar la respuesta json")
+                    # guardar respuesta cruda para debugging
                     current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
                     debug_key = f"digital/collectors/monnet/debug/response_error_{current_time}.txt"
                     upload_file_to_s3(response.content, debug_key)
-                    print(f"[DEBUG] Respuesta cruda guardada: {debug_key}")
+                    print(f"[debug] respuesta cruda guardada: {debug_key}")
                     break
                 
             elif response.status_code in [401, 403]:
-                print(f"[ERROR] Error de autorizacion {response.status_code}")
+                print(f"[error] error de autorizacion {response.status_code}")
                 if retry < max_retries - 1:
                     new_token = await token_cache_monnet.get_token(force_refresh=True)
                     if new_token:
                         current_token = new_token
                         headers["Authorization"] = current_token
-                        print("[INFO] Token renovado para descarga")
+                        print("[info] token renovado para descarga")
                     else:
-                        print("[ERROR] No se pudo renovar token")
+                        print("[error] no se pudo renovar token")
                 break
                 
             else:
-                print(f"[ERROR] Status {response.status_code}: {response.text[:200]}")
+                print(f"[error] status {response.status_code}: {response.text[:200]}")
                 if retry < max_retries - 1:
-                    print(f"[INFO] Reintentando en 5 segundos...")
+                    print(f"[info] reintentando en 5 segundos...")
                     await asyncio.sleep(5)
                 else:
                     break
                     
         except requests.exceptions.Timeout:
-            print(f"[ERROR] Timeout en la solicitud, reintento {retry + 1}")
+            print(f"[error] timeout en la solicitud, reintento {retry + 1}")
             if retry < max_retries - 1:
                 await asyncio.sleep(5)
             else:
                 break
                 
         except Exception as e:
-            print(f"[ERROR] Excepcion durante descarga: {e}")
+            print(f"[error] excepcion durante descarga: {e}")
             if retry < max_retries - 1:
                 await asyncio.sleep(5)
             else:
@@ -496,10 +410,10 @@ def json_excel_monnet():
             print(f"[SUCCESS] Procesado: {file_key} -> {output_key}")
 
         except Exception as e:
-            print(f"[ERROR] Error procesando {file_key}: {e}")
+            print(f"[error] error procesando {file_key}: {e}")
             continue
 
-    print(f"[INFO] Proceso JSON -> Excel completado. Archivos procesados: {processed_count}")
+    print(f"[info] proceso json -> excel completado. archivos procesados: {processed_count}")
 
 
 # =============================
@@ -507,32 +421,51 @@ def json_excel_monnet():
 # =============================
 async def get_data_main_async(from_date, to_date):
     try:
-        print(f"[INICIO] Procesando Monnet desde {from_date} hasta {to_date}")
+        print(f"[inicio] procesando monnet desde {from_date} hasta {to_date}")
         
-        # Obtener token del cache
+        # obtener token del cache
         token = await token_cache_monnet.get_token()
         if not token:
-            print("[ERROR] No se pudo obtener token de Monnet")
+            print("[error] no se pudo obtener token de monnet")
             return False
 
-        # Descargar datos
+        # descargar datos
         data_count, final_token = await get_data_json_monnet_async(token, from_date, to_date)
         
         if data_count and data_count > 0:
-            print(f"[INFO] {data_count} bytes descargados, generando archivo Excel")
+            print(f"[info] {data_count} bytes descargados, generando archivo excel")
             json_excel_monnet()
-            print("[SUCCESS] Proceso Monnet completado exitosamente")
+            print("[ok] proceso monnet completado exitosamente")
             return True
         else:
-            print(f"[INFO] No hay datos para procesar (registros: {data_count})")
+            print(f"[info] no hay datos para procesar (registros: {data_count})")
             return False
         
     except Exception as e:
-        print(f"[ERROR] Error en get_data_main_async: {e}")
+        print(f"[error] error en get_data_main_async: {e}")
         return False
 
 
 def get_data_main(from_date, to_date):
-    print(f"[WRAPPER] Ejecutando Monnet collector")
-    return asyncio.run(get_data_main_async(from_date, to_date))
+    # wrapper sincrono que ejecuta el proceso principal de monnet y mide el tiempo de ejecucion
+    start_time = time.time()
 
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso monnet | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*50}\n")
+
+    try:
+        result = asyncio.run(get_data_main_async(from_date, to_date))
+    except Exception as e:
+        print(f"[error] fallo ejecucion principal monnet: {e}")
+        result = False
+    finally:
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+
+        print(f"\n{'='*50}")
+        print(f"[fin] proceso monnet completado")
+        print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+        print(f"{'='*50}\n")
+
+    return result

@@ -5,27 +5,27 @@ from app.digital.collectors.monnet.get_qr_2mf.totp_generator import generate_otp
 from app.digital.collectors.monnet.get_qr_2mf.storage import save_secret
 
 def main():
-    print("[+] Capturando pantalla completa...")
+    print("[info] Capturando pantalla completa...")
     image = capture_full_screen()
 
-    print("[+] Detectando QR en la imagen...")
+    print("[info] Detectando QR en la imagen...")
     qr_data = extract_qr_data(image)
     if not qr_data:
-        print("[!] No se detecto ningun codigo QR.")
+        print("[alerta] No se detecto ningun codigo QR.")
         return
 
-    print(f"[+] QR detectado: {qr_data}")
+    print(f"[info] QR detectado: {qr_data}")
     secret, label = extract_secret_from_otpauth(qr_data)
     if not secret:
-        print("[!] No se pudo extraer la clave del QR.")
+        print("[alerta] No se pudo extraer la clave del QR.")
         return
 
-    print(f"[+] clave extraida para: {label}")
+    print(f"[info] clave extraida para: {label}")
     save_secret(label, secret)
-    print(f"[+] clave guardada con exito bajo el nombre '{label}'.")
+    print(f"[info] clave guardada con exito bajo el nombre '{label}'.")
 
     code = generate_otp(secret)
-    print(f"[+] Codigo OTP actual para {label}: {code}")
+    print(f"[info] Codigo OTP actual para {label}: {code}")
 
 if __name__ == "__main__":
     main()

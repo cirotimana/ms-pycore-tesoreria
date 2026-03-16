@@ -9,6 +9,8 @@ from app.config import Config
 from io import BytesIO
 from app.common.s3_utils import *
 import time
+from contextlib import contextmanager
+import random
 
 
 # =============================
@@ -26,23 +28,23 @@ class TokenCacheKashio:
             
             if (not force_refresh and self.token and 
                 self.expires_at and now < self.expires_at):
-                print("[INFO] Usando token Kashio del cache")
+                print("[info] usando token kashio del cache")
                 return self.token
 
-            print("[INFO] Obteniendo nuevo token Kashio...")
+            print("[info] obteniendo nuevo token kashio...")
             self.token = await get_token_kashio()
             
             if self.token:
-                # Token valido por 30 minutos
+                # token valido por 30 minutos
                 self.expires_at = now + timedelta(minutes=30)
-                print(f"[INFO] Token Kashio cacheado hasta {self.expires_at}")
+                print(f"[info] token kashio cacheado hasta {self.expires_at}")
             else:
-                print("[ERROR] No se pudo obtener nuevo token Kashio")
+                print("[error] no se pudo obtener nuevo token kashio")
             
             return self.token
 
     def invalidate(self):
-        print("[INFO] Invalidando token Kashio cacheado")
+        print("[info] invalidando token kashio cacheado")
         self.token = None
         self.expires_at = None
 
@@ -61,7 +63,7 @@ async def get_token_kashio():
     
     try:
         async with async_playwright() as p:
-            print("[INFO] Lanzando navegador para Kashio")
+            print("[info] lanzando navegador para kashio")
             browser = await p.chromium.launch(
                 headless=True,  
                 args=[
@@ -91,81 +93,81 @@ async def get_token_kashio():
                 headers = route.request.headers
                 if 'authorization' in headers and not token_found:
                     token_found = headers['authorization']
-                    print(f"[DEBUG] Token capturado: {token_found[:20]}...")
+                    print(f"[debug] token capturado: {token_found[:20]}...")
                 await route.continue_()
 
             await context.route("**/design.configuration*", handle_request)
             
-            print("[INFO] Navegando a Kashio")
+            print("[info] navegando a kashio")
             await page.goto("https://kpms.kashio.net/", wait_until='networkidle', timeout=60000)
 
-            # Verificar errores de carga
+            # verificar errores de carga
             page_content = await page.content()
             if "Oops" in page_content:
-                print("[ERROR] Error detectado al cargar la pagina KashIO")
+                print("[error] error detectado al cargar la pagina kashio")
                 return None
 
-            # NUEVA FUNCION PARA HACER LOGIN DE FORMA ROBUSTA
+            # nueva funcion para hacer login de forma robusta
             async def intentar_login():
                 try:
-                    # Esperar un poco para que la pagina cargue completamente
+                    # esperar un poco para que la pagina cargue completamente
                     await asyncio.sleep(3)
                     
-                    # ESTRATEGIA 1: Esperar explicitamente por los campos
-                    print("[DEBUG] Esperando campos de login...")
+                    # estrategia 1: esperar explicitamente por los campos
+                    print("[debug] esperando campos de login...")
                     try:
                         await page.wait_for_selector('input[name="email"]', state='visible', timeout=10000)
                         await page.wait_for_selector('input[name="password"]', state='visible', timeout=10000)
                         await page.wait_for_selector('#login-submit-button', state='visible', timeout=10000)
-                        print("[DEBUG] Campos de login encontrados (selectores estandar)")
+                        print("[debug] campos de login encontrados (selectores estandar)")
                     except:
-                        print("[WARN] No se encontraron con selectores estandar, intentando alternativas...")
+                        print("[warn] no se encontraron con selectores estandar, intentando alternativas...")
                         
-                        # ESTRATEGIA 2: Buscar por tipo de input
+                        # estrategia 2: buscar por tipo de input
                         email_input = await page.query_selector('input[type="email"]')
                         password_input = await page.query_selector('input[type="password"]')
                         submit_button = await page.query_selector('button[type="submit"]')
                         
                         if not (email_input and password_input and submit_button):
-                            print("[ERROR] No se pudieron encontrar los campos de login")
+                            print("[error] no se pudieron encontrar los campos de login")
                             return False
                     
-                    # Verificar visibilidad
+                    # verificar visibilidad
                     email_visible = await page.is_visible('input[name="email"]') or await page.is_visible('input[type="email"]')
                     password_visible = await page.is_visible('input[name="password"]') or await page.is_visible('input[type="password"]')
                     button_visible = await page.is_visible('#login-submit-button') or await page.is_visible('button[type="submit"]')
                     
-                    print(f"[DEBUG] Email visible: {email_visible}")
-                    print(f"[DEBUG] Password visible: {password_visible}")
-                    print(f"[DEBUG] Boton visible: {button_visible}")
+                    print(f"[debug] email visible: {email_visible}")
+                    print(f"[debug] password visible: {password_visible}")
+                    print(f"[debug] boton visible: {button_visible}")
                     
                     if not (email_visible and password_visible and button_visible):
-                        print("[WARN] Algunos campos no visibles, esperando mas tiempo...")
+                        print("[warn] algunos campos no visibles, esperando mas tiempo...")
                         await asyncio.sleep(3)
                     
-                    # ESTRATEGIA 3: Llenar con multiples intentos
-                    print("[INFO] Llenando campo email...")
+                    # estrategia 3: llenar con multiples intentos
+                    print("[info] llenando campo email...")
                     
-                    # Intentar por name primero
+                    # intentar por name primero
                     try:
                         await page.fill('input[name="email"]', Config.USER_NAME_KASHIO, timeout=5000)
                     except:
-                        # Fallback a tipo
+                        # fallback a tipo
                         await page.fill('input[type="email"]', Config.USER_NAME_KASHIO, timeout=5000)
                     
-                    # Pequeña pausa
+                    # pequeña pausa
                     await asyncio.sleep(0.5)
                     
-                    print("[INFO] Llenando campo password...")
+                    print("[info] llenando campo password...")
                     try:
                         await page.fill('input[name="password"]', Config.PASSWORD_KASHIO, timeout=5000)
                     except:
                         await page.fill('input[type="password"]', Config.PASSWORD_KASHIO, timeout=5000)
                     
-                    # Pequeña pausa antes de hacer click
+                    # pequeña pausa antes de hacer click
                     await asyncio.sleep(0.5)
                     
-                    print("[INFO] Haciendo click en login...")
+                    print("[info] haciendo click en login...")
                     try:
                         await page.click('#login-submit-button', timeout=5000)
                     except:
@@ -174,64 +176,64 @@ async def get_token_kashio():
                     return True
                     
                 except Exception as e:
-                    print(f"[ERROR] Error en intentar_login: {e}")
+                    print(f"[error] error en intentar_login: {e}")
                     return False
             
-            # Hacer el primer intento de login
+            # hacer el primer intento de login
             login_success = await intentar_login()
             if not login_success:
-                print("[ERROR] Fallo el primer intento de login")
+                print("[error] fallo el primer intento de login")
                 return None
             
-            # Esperar redireccion
+            # esperar redireccion
             try:
                 await page.wait_for_url("**/home**", timeout=15000)
-                print("[INFO] Login exitoso - Redirigido a home")
+                print("[info] login exitoso - redirigido a home")
             except:
-                print("[INFO] No hubo redireccion inmediata despues del login")
+                print("[info] no hubo redireccion inmediata despues del login")
 
-            # Esperar token
+            # esperar token
             max_wait_cycles = 10       
             wait_per_cycle = 60
 
-            print(f"[INFO] Esperando captura del token (hasta {max_wait_cycles * wait_per_cycle}s totales)")
+            print(f"[info] esperando captura del token (hasta {max_wait_cycles * wait_per_cycle}s totales)")
             for attempt in range(max_wait_cycles):
                 for i in range(wait_per_cycle):
                     if token_found:
-                        print(f"[SUCCESS] Token capturado en segundo {attempt * wait_per_cycle + i + 1}")
+                        print(f"[ok] token capturado en segundo {attempt * wait_per_cycle + i + 1}")
                         break
                     await asyncio.sleep(1)
 
                 if token_found:
                     break
                 else:
-                    print(f"[WARN] Intento {attempt + 1}/{max_wait_cycles} sin token. Refrescando pagina y reintentando login...")
+                    print(f"[warn] intento {attempt + 1}/{max_wait_cycles} sin token. refrescando pagina y reintentando login...")
                     try:
                         await page.reload(wait_until='networkidle', timeout=30000)
                         
-                        # Reintentar login despues del reload
+                        # reintentar login despues del reload
                         await intentar_login()
                         
                     except Exception as e:
-                        print(f"[ERROR] Fallo al refrescar intento {attempt + 1}: {e}")
+                        print(f"[error] fallo al refrescar intento {attempt + 1}: {e}")
                     await asyncio.sleep(5)
 
             if token_found:
-                print("[INFO] Token capturado exitosamente")
+                print("[info] token capturado exitosamente")
                 return token_found
             else:
-                print("[ERROR] No se encontro token despues de reintentos")
+                print("[error] no se encontro token despues de reintentos")
                 return None
                 
     except Exception as e:
-        print(f"[ERROR] Error general en get_token_kashio: {e}")
+        print(f"[error] error general en get_token_kashio: {e}")
         return None
         
     finally:
         await close_playwright_resources_kashio(browser, context, page)
 
 async def close_playwright_resources_kashio(browser, context, page):
-    print("[INFO] Cerrando recursos de Kashio...")
+    print("[info] cerrando recursos de kashio...")
 
     cleanup_tasks = [] 
     if page:
@@ -246,39 +248,27 @@ async def close_playwright_resources_kashio(browser, context, page):
     if cleanup_tasks: 
         try: 
             await asyncio.gather(*cleanup_tasks, return_exceptions=True) 
-            print("[DEBUG] Recursos de Kashio cerrados correctamente")
+            print("[debug] recursos de kashio cerrados correctamente")
         except Exception as e: 
-            print(f"[WARN] Error cerrando recursos de Kashio: {e}")
+            print(f"[warn] error cerrando recursos de kashio: {e}")
 
 # =============================
 #   FUNCIONES DE DATOS 
 # =============================
-async def get_data_json_kashio_async(token, from_date, to_date):
-    start_date = from_date
-    end_date = to_date + timedelta(days=1)
-    
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": token
-    }
-    
-    url = "https://ns10-api-web-extranet.kashio.com.pe/kcms/v1/customers/cus_TZgE7VA6xSxTjmN8eutJcm/payments"
-    limit = 500
-
-    total_data = 0
-    current_token = token
-
-    current_day = start_date
-    while current_day < end_date:
-        print(f"[INFO] Descargando transacciones para {current_day.date()}")
+async def download_day_data(current_day, headers, url, limit, semaphore):
+    # funcion auxiliar para descargar la data de un solo dia con paginacion y limite de concurrencia
+    async with semaphore:
+        # jitter aleatorio para evitar que multiples peticiones golpeen el gateway al mismo tiempo
+        jitter = random.uniform(0, 5)
+        await asyncio.sleep(jitter)
+        print(f"[info] iniciando descarga para {current_day.date()} (concurrencia controlada)")
         
         from_dt = current_day.replace(hour=5, minute=0, second=0)
         to_dt = (current_day + timedelta(days=1)).replace(hour=5, minute=0, second=0)
         from_date_str = from_dt.strftime("%Y-%m-%d %H:%M:%S")
         to_date_str = to_dt.strftime("%Y-%m-%d %H:%M:%S")
         
-        all_data = []
+        all_day_data = []
         offset = 0
         has_more_data = True
         
@@ -296,20 +286,17 @@ async def get_data_json_kashio_async(token, from_date, to_date):
             
             for retry in range(max_retries):
                 try:
-                    response = requests.get(url, headers=headers, params=params, timeout=500)
+                    # usamos to_thread para evitar bloquear el event loop con requests (que es sincrono)
+                    response = await asyncio.to_thread(requests.get, url, headers=headers, params=params, timeout=500)
                     
                     if response.status_code == 200:
                         data = response.json()
-                        if isinstance(data, dict) and 'data' in data:
-                            registros = data['data']
-                        else:
-                            registros = data
+                        registros = data.get('data') if isinstance(data, dict) and 'data' in data else data
                             
                         if registros:
-                            all_data.extend(registros)
-                            print(f"[INFO] Descargados {len(registros)} registros (offset {offset})")
+                            all_day_data.extend(registros)
+                            print(f"[info] {current_day.date()} | descargados {len(registros)} registros (offset {offset})")
                             
-                            # Verificar si hay mas datos
                             if len(registros) < limit:
                                 has_more_data = False
                             else:
@@ -318,150 +305,194 @@ async def get_data_json_kashio_async(token, from_date, to_date):
                             success = True
                             break
                         else:
-                            print(f"[INFO] No hay mas registros para {current_day.date()}")
+                            print(f"[info] {current_day.date()} | no hay más registros")
                             has_more_data = False
                             success = True
                             break
                             
                     elif response.status_code in [401, 403]:
-                        print(f"[ERROR] Error de autorizacion {response.status_code}")
-                        if retry < max_retries - 1:
-                            new_token = await token_cache_kashio.get_token(force_refresh=True)
-                            if new_token:
-                                current_token = new_token
-                                headers["Authorization"] = current_token
-                                print("[INFO] Token renovado para descarga")
-                            else:
-                                print("[ERROR] No se pudo renovar token")
-                        break
+                        print(f"[error] {current_day.date()} | error de autorizacion {response.status_code}")
+                        return None
                         
                     elif response.status_code in [502, 504]:
-                        print(f"[WARN] Error {response.status_code} en offset {offset}, reintento {retry + 1}")
-                        if retry < max_retries - 1:
-                            await asyncio.sleep(5)
-                        else:
-                            has_more_data = False
-                            break
-                            
+                        # backoff con jitter: empieza corto y crece, maximo 30 segundos
+                        base_wait = min(2 * (2 ** retry), 30)
+                        wait_time = base_wait + random.uniform(0, 5)
+                        print(f"[warn] {current_day.date()} | error {response.status_code}, reintento {retry + 1}, esperando {wait_time:.1f}s")
+                        await asyncio.sleep(wait_time)
                     else:
-                        print(f"[ERROR] Status {response.status_code}: {response.text[:200]}")
+                        print(f"[error] {current_day.date()} | status {response.status_code}: {response.text[:100]}")
                         has_more_data = False
                         break
                         
                 except Exception as e:
-                    print(f"[ERROR] Excepcion durante descarga: {e}")
+                    print(f"[error] {current_day.date()} | excepcion: {e}")
                     if retry < max_retries - 1:
-                        await asyncio.sleep(5)
+                        await asyncio.sleep(10)
                     else:
                         has_more_data = False
                         break
             
             if not success:
-                print(f"[ERROR] No se pudo descargar datos para offset {offset}")
                 break
-            
-            # Pequena pausa entre requests
+                
             if has_more_data:
                 await asyncio.sleep(1)
         
-        print(f"[INFO] Descarga completa para {current_day.date()}, total registros: {len(all_data)}")
-        total_data += len(all_data)
-        
-        # Guardar datos del dia
-        if all_data:
+        if all_day_data:
             current_time = datetime.now(pytz.timezone("America/Lima")).strftime('%Y%m%d%H%M%S')
-            file_key = f"digital/collectors/kashio/input/response_{current_time}.json"
-            upload_file_to_s3(json.dumps(all_data, ensure_ascii=False).encode("utf-8"), file_key)
-            print(f"[SUCCESS] Archivo guardado en S3: {file_key}")
-            
-        current_day += timedelta(days=1)
+            ms = datetime.now().strftime('%f')
+            file_key = f"digital/collectors/kashio/input/response_{current_time}_{ms}.json"
+            upload_file_to_s3(json.dumps(all_day_data, ensure_ascii=False).encode("utf-8"), file_key)
+            print(f"[success] {current_day.date()} | guardado en s3: {file_key}")
+            return len(all_day_data)
         
-        # Pausa entre dias
-        if current_day < end_date:
-            await asyncio.sleep(2)
-            
-    print(f"[INFO] Total general de registros descargados: {total_data}")
-    return total_data, current_token
+        return 0
+
+
+async def get_data_json_kashio_async(token, from_date, to_date):
+    start_date = from_date
+    end_date = to_date + timedelta(days=1)
+    
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": token
+    }
+    
+    url = "https://ns10-api-web-extranet.kashio.com.pe/kcms/v1/customers/cus_TZgE7VA6xSxTjmN8eutJcm/payments"
+    limit = 500
+    
+    # limitamos la concurrencia a 2 solicitudes simultaneas para evitar saturar el servidor (error 504)
+    semaphore = asyncio.Semaphore(2)
+
+    days_to_process = []
+    current_day = start_date
+    while current_day < end_date:
+        days_to_process.append(current_day)
+        current_day += timedelta(days=1)
+
+    print(f"[info] iniciando descarga controlada para {len(days_to_process)} dias (max 2 hilos)")
+    
+    tasks = [download_day_data(day, headers, url, limit, semaphore) for day in days_to_process]
+    results = await asyncio.gather(*tasks)
+    
+    total_records = sum(r for r in results if r is not None)
+    
+    print(f"[info] total general de registros descargados: {total_records}")
+    return total_records, token
+
+
+async def process_single_json_file(s3_key):
+    # funcion auxiliar para procesar un solo json a excel en paralelo
+    try:
+        print(f"[info] procesando {s3_key}...")
+        content = read_file_from_s3(s3_key)
+        data = json.loads(content.decode("utf-8"))
+
+        if not data:
+            print(f"[warn] archivo vacio: {s3_key}")
+            return False
+
+        # Transformar los datos para el DataFrame
+        rows = []
+        for item in data:
+            invoice = item.get("invoice_list", [{}])[0] if item.get("invoice_list") else {}
+            row = {
+                "FECHA DE REGISTRO": (
+                    pd.to_datetime(item.get("created"), errors="coerce") - timedelta(hours=5)
+                ).strftime("%d/%m/%Y %H:%M:%S") if item.get("created") else "",
+                "REFERENCIA DE PAGO": item.get("reference", ""),
+                "CLIENTE": item.get("customer", {}).get("name", ""),
+                "REFERENCIA DE ORDEN": invoice.get("external_id", ""),
+                "DESCRIPCION": invoice.get("name", ""),
+                "SUBTOTAL": invoice.get("sub_total", {}).get("value", ""),
+                "MORA": invoice.get("late_fee", {}).get("value", ""),
+                "TOTAL": invoice.get("total", {}).get("value", ""),
+                "METODO DE PAGO": item.get("metadata", {}).get("psp_account", {}).get("name", ""),
+                "OPERACION": "Pago",
+                "ESTADO": item.get("status", "")
+            }
+            rows.append(row)
+        
+        df = pd.DataFrame(rows)
+
+        # Limpiar referencia de orden
+        df['REFERENCIA DE ORDEN'] = (
+            df['REFERENCIA DE ORDEN']
+            .str.replace('-ATP', '', regex=False)
+            .str.replace('-', '.', regex=False)
+        )
+
+        column_order = [
+            "FECHA DE REGISTRO", "REFERENCIA DE PAGO", "CLIENTE", "REFERENCIA DE ORDEN",
+            "DESCRIPCION", "SUBTOTAL", "MORA", "TOTAL", "METODO DE PAGO", "OPERACION", "ESTADO"
+        ]
+        df = df[column_order]
+
+        excel_key = s3_key.replace(".json", ".xlsx")
+
+        with bytes_io_context() as buffer:
+            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False)
+            buffer.seek(0)
+            upload_file_to_s3(buffer.getvalue(), excel_key)
+
+        # mover a processed
+        processed_key = s3_key.replace("/input/", "/input/processed/", 1)
+        if copy_file_in_s3(s3_key, processed_key):
+            delete_file_from_s3(s3_key)
+        print(f"[success] procesado: {s3_key} -> {excel_key}")
+        return True
+    except Exception as e:
+        print(f"[error] error procesando {s3_key}: {e}")
+        return False
+
+
+async def json_excel_kashio_async():
+    # version asincrona para procesar archivos en paralelo
+    try:
+        s3_prefix = "digital/collectors/kashio/input/"
+        s3_files = list_files_in_s3(s3_prefix)
+
+        files_to_process = [
+            f for f in s3_files 
+            if f.endswith(".json") and "/input/processed/" not in f
+        ]
+
+        if not files_to_process:
+            print("[info] no hay archivos json para procesar")
+            return
+
+        print(f"[info] procesando {len(files_to_process)} archivos en paralelo...")
+        tasks = [process_single_json_file(f) for f in files_to_process]
+        await asyncio.gather(*tasks)
+        
+        print("[success] proceso json -> excel completado")
+    except Exception as e:
+        print(f"[error] error en json_excel_kashio: {e}")
+
+
+@contextmanager
+def bytes_io_context():
+    buffer = BytesIO()
+    try:
+        yield buffer
+    finally:
+        buffer.close()
 
 
 def json_excel_kashio():
-    
-    prefix = "digital/collectors/kashio/input/"
-    files = list_files_in_s3(prefix)
-    
-    processed_count = 0
-
-    for file_key in files:
-        if not file_key.endswith(".json"):
-            continue
-        
-        if "/input/processed/" in file_key:
-            continue  
-
-        print(f"[INFO] Procesando {file_key}...")
-        try:
-            content = read_file_from_s3(file_key)
-            data = json.loads(content.decode("utf-8"))
-
-            if isinstance(data, dict):
-                data = data.get("data") or data.get("results") or data.get("invoices") or []
-            
-            rows = []
-            
-            for item in data:
-                invoice = item.get("invoice_list", [{}])[0] if item.get("invoice_list") else {}
-                row = {
-                    "FECHA DE REGISTRO": (
-                        pd.to_datetime(item.get("created"), errors="coerce") - timedelta(hours=5)
-                    ).strftime("%d/%m/%Y %H:%M:%S") if item.get("created") else "",
-                    "REFERENCIA DE PAGO": item.get("reference", ""),
-                    "CLIENTE": item.get("customer", {}).get("name", ""),
-                    "REFERENCIA DE ORDEN": invoice.get("external_id", ""),
-                    "DESCRIPCION": invoice.get("name", ""),
-                    "SUBTOTAL": invoice.get("sub_total", {}).get("value", ""),
-                    "MORA": invoice.get("late_fee", {}).get("value", ""),
-                    "TOTAL": invoice.get("total", {}).get("value", ""),
-                    "METODO DE PAGO": item.get("metadata", {}).get("psp_account", {}).get("name", ""),
-                    "OPERACION": "Pago",
-                    "ESTADO": item.get("status", "")
-                }
-                rows.append(row)
-                
-            df = pd.DataFrame(rows)
-
-            # Limpiar referencia de orden
-            df['REFERENCIA DE ORDEN'] = (
-                df['REFERENCIA DE ORDEN']
-                .str.replace('-ATP', '', regex=False)
-                .str.replace('-', '.', regex=False)
-            )
-
-            column_order = [
-                "FECHA DE REGISTRO", "REFERENCIA DE PAGO", "CLIENTE", "REFERENCIA DE ORDEN",
-                "DESCRIPCION", "SUBTOTAL", "MORA", "TOTAL", "METODO DE PAGO", "OPERACION", "ESTADO"
-            ]
-            df = df[column_order]
-
-            # Guardar Excel
-            with BytesIO() as excel_buffer:
-                df.to_excel(excel_buffer, index=False)
-                excel_buffer.seek(0)
-                output_key = file_key.replace(".json", ".xlsx")
-                upload_file_to_s3(excel_buffer.getvalue(), output_key)
-                
-            # Mover JSON a processed
-            processed_key = file_key.replace("input/", "input/processed/", 1)
-            upload_file_to_s3(content, processed_key)
-            delete_file_from_s3(file_key)
-
-            processed_count += 1
-            print(f"[SUCCESS] Procesado: {file_key} -> {output_key}")
-
-        except Exception as e:
-            print(f"[ERROR] Error procesando {file_key}: {e}")
-            continue
-
-    print(f"[INFO] Proceso JSON -> Excel completado. Archivos procesados: {processed_count}")
+    # wrapper sincrono para mantener compatibilidad
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # si ya estamos en un loop (como en get_data_main_async), usamos un task
+            asyncio.create_task(json_excel_kashio_async())
+        else:
+            asyncio.run(json_excel_kashio_async())
+    except Exception as e:
+        print(f"[error] error al lanzar json_excel_kashio: {e}")
 
 
 # =============================
@@ -469,31 +500,52 @@ def json_excel_kashio():
 # =============================
 async def get_data_main_async(from_date, to_date):
     try:
-        print(f"[INICIO] Procesando Kashio desde {from_date} hasta {to_date}")
+        print(f"[inicio] procesando kashio desde {from_date} hasta {to_date}")
         
-        # Obtener token del cache
+        # obtener token del cache
         token = await token_cache_kashio.get_token()
         if not token:
-            print("[ERROR] No se pudo obtener token de Kashio")
+            print("[error] no se pudo obtener token de kashio")
             return False
 
-        # Descargar datos
+        # descargar datos en paralelo
         data_count, final_token = await get_data_json_kashio_async(token, from_date, to_date)
         
         if data_count and data_count > 0:
-            print(f"[INFO] {data_count} registros descargados, generando archivo Excel")
-            json_excel_kashio()
-            print("[SUCCESS] Proceso Kashio completado exitosamente")
+            print(f"[info] {data_count} registros descargados, generando archivo excel")
+            await json_excel_kashio_async()
+            print("[ok] proceso kashio completado exitosamente")
             return True
         else:
-            print("[INFO] No hay datos para procesar")
+            print("[info] no hay datos para procesar")
             return False
         
     except Exception as e:
-        print(f"[ERROR] Error en get_data_main_async: {e}")
+        print(f"[error] error en get_data_main_async: {e}")
         return False
 
 
 def get_data_main(from_date, to_date):
-    print(f"[WRAPPER] Ejecutando Kashio collector")
-    return asyncio.run(get_data_main_async(from_date, to_date))
+    # wrapper que asegura el formato de fechas
+    start_time = time.time()
+
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso kashio | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*50}\n")
+    
+    try:
+        result = asyncio.run(get_data_main_async(from_date, to_date))
+    except Exception as e:
+        print(f"[error] fallo ejecucion principal kashio: {e}")
+        result = False
+    finally:
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        
+        print(f"\n{'='*50}")
+        print(f"[fin] proceso kashio completado")
+        print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+        print(f"{'='*50}\n")
+    
+    return result
+

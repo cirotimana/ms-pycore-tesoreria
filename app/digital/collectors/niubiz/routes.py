@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, status
 from celery.exceptions import TimeoutError as CeleryTimeoutError
 import logging
 
-# Configuración de logging
+# configuracion de logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter()

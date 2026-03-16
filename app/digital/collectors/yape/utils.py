@@ -32,7 +32,7 @@ class TokenCacheYape:
                 print("[INFO] Usando token Yape del cache")
                 return self.token
 
-            print(f"[INFO] Obteniendo nuevo token Yape tipo {type}...")
+            print(f"[info] obteniendo nuevo token yape tipo {type}...")
             if type == 1:
                 self.token = await get_token_yape_1()
             else:
@@ -60,7 +60,7 @@ token_cache_yape = TokenCacheYape()
 
 # paso 1 obtenemos token##
 async def get_token_yape_2(max_login_attempts=5):
-    print("[INFO] Iniciando Playwright para obtener token Yape")
+    print("[info] iniciando playwright para obtener token yape")
     
     browser = None
     context = None
@@ -68,12 +68,12 @@ async def get_token_yape_2(max_login_attempts=5):
     
     try:
         async with async_playwright() as p:
-            print("[INFO] Lanzando navegador para Yape")
+            print("[info] lanzando navegador para yape")
             browser = await p.chromium.launch(
                 headless=True,
                 args=[
                     "--no-sandbox",
-                    "--disable-dev-shm-usage",
+                    "--disable-dev-shm-usage", 
                     "--disable-gpu",
                     "--no-zygote",
                     "--single-process",
@@ -84,7 +84,7 @@ async def get_token_yape_2(max_login_attempts=5):
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             )
 
-            print("[INFO] Inyectando script para ocultar webdriver")
+            print("[info] inyectando script para ocultar webdriver")
             await context.add_init_script("""
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
@@ -99,13 +99,13 @@ async def get_token_yape_2(max_login_attempts=5):
                 headers = request.headers
                 if 'authorization' in headers and not token_found:
                     token_found = headers['authorization']
-                    print(f"[DEBUG] Token detectado: {token_found[:20]}...")
+                    print(f"[debug] token detectado: {token_found[:20]}...")
                 await route.continue_()
 
-            print("[INFO] Interceptando todas las requests para buscar el token")
+            print("[info] interceptando todas las requests para buscar el token")
             await context.route("**", handle_request)
 
-            print("[INFO] Navegando a https://www.niubizenlinea.com.pe/")
+            print("[info] navegando a https://www.niubizenlinea.com.pe/")
             try:
                 await page.goto("https://www.niubizenlinea.com.pe/", wait_until="networkidle", timeout=60000)
                 print("[INFO] Pagina cargada correctamente")
@@ -115,14 +115,14 @@ async def get_token_yape_2(max_login_attempts=5):
 
             async def intentar_login_yape():
                 try:
-                    print("[DEBUG] Esperando que los campos esten visibles...")
+                    print("[debug] esperando que los campos esten visibles...")
                     await asyncio.sleep(3)
                     
                     # Cerrar modal de cookies si existe
                     try:
                         cookie_modal = await page.query_selector('#CybotCookiebotDialog')
                         if cookie_modal:
-                            print("[DEBUG] Modal de cookies detectado, intentando cerrar...")
+                            print("[debug] modal de cookies detectado, intentando cerrar...")
                             
                             # Intentar hacer clic en "Aceptar todas"
                             cookie_buttons = [
@@ -449,8 +449,32 @@ async def get_download_data_yape_async(token, from_date, to_date):
     return id_list, current_token
 
 
+async def delete_yape_report_async(token, download_id, user_id="68acfb6c8029a31646a25391"):
+    url = "https://api.niubizenlinea.com.pe/ms-download/api/downloads/user"
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+        "Authorization": token,
+        "Origin": "https://www.niubizenlinea.com.pe",
+        "Referer": "https://www.niubizenlinea.com.pe/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+    }
+    payload = {"downloadId": download_id, "userId": user_id}
+    try:
+        response = requests.delete(url, headers=headers, json=payload, timeout=60)
+        if response.status_code == 200:
+            print(f"[SUCCESS] Reporte {download_id} eliminado de la bandeja")
+            return True
+        else:
+            print(f"[WARN] No se pudo eliminar el reporte {download_id}: {response.text}")
+            return False
+    except Exception as e:
+        print(f"[ERROR] Error al eliminar reporte {download_id}: {e}")
+        return False
+
+
 # paso 3: verificar estado de los reportes
-async def check_download_status_async(token, user_id="68acfb6c8029a31646a25391"):
+async def check_download_status_async(token, id_list=None, user_id="68acfb6c8029a31646a25391"):
     headers = {
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json",
@@ -474,17 +498,25 @@ async def check_download_status_async(token, user_id="68acfb6c8029a31646a25391")
             data = response.json()
             
             if "downloadsList" in data:
-                completed_downloads = []
+                all_status = []
                 for download in data["downloadsList"]:
-                    if download.get("downloadStatus", {}).get("description") == "Terminado":
-                        completed_downloads.append({
-                            "id": download["_id"],
-                            "filename": download["filename"],
-                            "status": download["downloadStatus"]["description"]
-                        })
-                        print(f"[INFO] Archivo listo: {download['_id']} - {download['filename']}")
+                    d_id = download["_id"]
+                    d_status = download.get("downloadStatus", {}).get("description", "Desconocido")
+                    
+                    # Solo loguear si está en la lista solicitada
+                    if id_list and d_id in id_list:
+                        if d_status == "Terminado":
+                            print(f"[INFO] Archivo listo: {d_id} - {download['filename']}")
+                        elif d_status == "Error":
+                            print(f"[ERROR] Reporte fallido en Niubiz: {d_id}")
+                    
+                    all_status.append({
+                        "id": d_id,
+                        "filename": download["filename"],
+                        "status": d_status
+                    })
                 
-                return completed_downloads
+                return all_status
             else:
                 print("[WARN] No se encontro 'downloadsList' en la respuesta")
                 return []
@@ -563,15 +595,14 @@ async def download_files_async(token, download_ids):
                     extracted_files = process_zip_file_yape(content, current_time)
                     downloaded_files.extend(extracted_files)
                 else:
-                    # Si no es ZIP, guardar directamente
                     output_key = f"digital/collectors/yape/input/{filename.replace('.zip', '')}_{current_time}"
-                    
                     with BytesIO(content) as buffer:
                         upload_file_to_s3(buffer.getvalue(), output_key)
-                    
-                    # download_file_from_s3_to_local(output_key)  # Comentado para optimizar
                     downloaded_files.append(output_key)
                     print(f"[SUCCESS] Archivo guardado: {output_key}")
+                
+                # ELIMINAR DE BANDEJA TRAS DESCARGA
+                await delete_yape_report_async(token, download_id)
                 
             else:
                 print(f"[ERROR] Error {response.status_code} descargando {download_id}: {response.text}")
@@ -583,7 +614,7 @@ async def download_files_async(token, download_ids):
 
 
 # funcion que combina todo el proceso
-async def get_yape_reports_async(token, from_date, to_date, max_wait_minutes=30):
+async def get_yape_reports_async(token, from_date, to_date, max_wait_minutes=15):
     print("[INFO] Iniciando proceso completo de descarga de reportes Yape")
     
     # Paso 1: Solicitar reportes
@@ -601,17 +632,19 @@ async def get_yape_reports_async(token, from_date, to_date, max_wait_minutes=30)
     for attempt in range(max_attempts):
         print(f"[INFO] Verificando estado (intento {attempt + 1}/{max_attempts})")
         
-        completed_downloads = await check_download_status_async(updated_token)
+        all_downloads = await check_download_status_async(updated_token, id_list=id_list)
         
         # Filtrar solo los IDs que solicitamos
-        ready_downloads = [d for d in completed_downloads if d["id"] in id_list]
+        ready_downloads = [d for d in all_downloads if d["id"] in id_list and d["status"] == "Terminado"]
+        failed_downloads = [d for d in all_downloads if d["id"] in id_list and d["status"] == "Error"]
         
+        if failed_downloads:
+            print(f"[ERROR] Abortando espera: {len(failed_downloads)} reportes fallaron en Niubiz")
+            break
+
         if len(ready_downloads) == len(id_list):
             print(f"[SUCCESS] Todos los reportes están listos ({len(ready_downloads)})")
-            
-            # Paso 3: Descargar archivos
-            downloaded_files = await download_files_async(updated_token, ready_downloads)
-            return downloaded_files
+            break
         
         elif ready_downloads:
             print(f"[INFO] {len(ready_downloads)}/{len(id_list)} reportes listos")
@@ -620,14 +653,13 @@ async def get_yape_reports_async(token, from_date, to_date, max_wait_minutes=30)
             print("[INFO] Esperando 30 segundos antes del siguiente chequeo...")
             await asyncio.sleep(30)
     
-    print(f"[WARN] Timeout después de {max_wait_minutes} minutos")
-    
-    # Descargar los que estén listos
+    # Paso 3: Descargar archivos (los que estén listos)
     if ready_downloads:
         print(f"[INFO] Descargando {len(ready_downloads)} archivos disponibles")
         downloaded_files = await download_files_async(updated_token, ready_downloads)
         return downloaded_files
     
+    print("[WARN] No se descargaron archivos.")
     return []
 
 
@@ -648,13 +680,27 @@ async def get_data_main_async_2(from_date, to_date):
             print("[ALERTA] No se pudo obtener el token de Yape.")
             
     except Exception as e:
-        print(f"[✖] Error en obtener la data de Yape: {e}")
+        print(f"[error] Error en obtener la data de Yape: {e}")
     
 
 def get_data_main_2(from_date, to_date):
-    print(f"[INICIO] Ejecutando Yape para {from_date} a {to_date}")
-    result = asyncio.run(get_data_main_async_2(from_date, to_date))
-    print(f"[FIN] Proceso Yape completado {result}")
+    start_time = time.time()
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso extraccion async yape | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*50}\n")
+    print(f"[wrapper] ejecutando yape collector")
+    
+    result = None
+    try:
+        result = asyncio.run(get_data_main_async_2(from_date, to_date))
+    except Exception as e:
+        print(f"[error] error en get_data_main_2: {e}")
+        
+    elapsed_time = time.time() - start_time
+    print(f"\n{'='*50}")
+    print(f"[fin] proceso yape completado")
+    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+    print(f"{'='*50}\n")
     return result
 
 
@@ -675,7 +721,7 @@ def save_dfs_to_excel(writer, dfs_dict, chunk_size=1_000_000):
 #   OPCION JSON 
 # =============================
 async def get_token_yape_1(max_login_attempts=3):
-    print("[INFO] Iniciando Playwright para obtener token Yape")
+    print("[info] iniciando playwright para obtener token yape")
     browser = None
     context = None
     page = None
@@ -687,7 +733,7 @@ async def get_token_yape_1(max_login_attempts=3):
                 headless=True,
                 args=[
                     "--no-sandbox",
-                    "--disable-dev-shm-usage",
+                    "--disable-dev-shm-usage", 
                     "--disable-gpu",
                     "--no-zygote",
                     "--single-process",
@@ -698,7 +744,7 @@ async def get_token_yape_1(max_login_attempts=3):
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             )
 
-            print("[INFO] Inyectando script para ocultar webdriver")
+            print("[info] inyectando script para ocultar webdriver")
             await context.add_init_script("""
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
@@ -713,7 +759,7 @@ async def get_token_yape_1(max_login_attempts=3):
                 headers = request.headers
                 if 'authorization' in headers and not token_found:
                     token_found = headers['authorization']
-                    print(f"[DEBUG] Token detectado: {token_found[:20]}...")
+                    print(f"[debug] token detectado: {token_found[:20]}...")
                 await route.continue_()
 
             print("[INFO] Interceptando todas las requests para buscar el token")
@@ -924,7 +970,7 @@ async def get_data_json_yape_async(token, from_date, to_date):
         file_key = f"digital/collectors/yape/input/response_{current_time}.json"
 
         upload_file_to_s3(json.dumps(all_data, ensure_ascii=False).encode("utf-8"), file_key)
-        print(f"[✔] Archivo guardado en S3: {file_key} con {len(all_data)} registros")
+        print(f"[ok] Archivo guardado en S3: {file_key} con {len(all_data)} registros")
         ##download_file_from_s3_to_local(file_key)  # pruebitas
     return len(all_data)
 
@@ -954,12 +1000,29 @@ async def get_data_main_json_async(from_date, to_date):
             return []  
 
     except Exception as e:
-        print(f"[✖] Error en obtener la data de Yape json: {e}")
+        print(f"[error] Error en obtener la data de Yape json: {e}")
         return []
 
 
 def get_data_main_json(from_date, to_date):
-    return asyncio.run(get_data_main_json_async(from_date, to_date))
+    start_time = time.time()
+    print(f"\n{'='*50}")
+    print(f"[inicio] proceso extraccion json yape | rango: {from_date.date()} a {to_date.date()}")
+    print(f"{'='*50}\n")
+    print(f"[wrapper] ejecutando yape json collector")
+    
+    result = None
+    try:
+        result = asyncio.run(get_data_main_json_async(from_date, to_date))
+    except Exception as e:
+        print(f"[error] error en get_data_main_json: {e}")
+        
+    elapsed_time = time.time() - start_time
+    print(f"\n{'='*50}")
+    print(f"[fin] proceso yape json completado")
+    print(f"[tiempo] duracion total: {elapsed_time / 60:.2f} minutos")
+    print(f"{'='*50}\n")
+    return result
 
 
 
@@ -1029,14 +1092,7 @@ def json_excel_yape():
         ##download_file_from_s3_to_local(output_key)##solo para pruebitas
         print(f"[INFO] Procesado: {file_key} -> {output_key} y movido a {processed_key}")
 
-    print("[✔] Proceso Json -> Excel completado.")
+    print("[ok] Proceso Json -> Excel completado.")
     return processed_files 
 
 
-
-if __name__ == "__main__":
-    lima_tz = pytz.timezone("America/Lima")
-    now = datetime.now(lima_tz)
-    print(f"[DEBUG] Enviando fechas from_date : {now} , to_date : {now}")
-    result = get_data_main_json(now, now)
-    print(f"[DEBUG] Resultados finales: {result}")

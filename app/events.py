@@ -3,7 +3,7 @@ import asyncio
 from app.utils.endpoint_lock import endpoint_lock 
 
 
-# CANAL DIGITAL
+# canal digital
 from app.digital.collectors.kashio.main import get_main_kashio, get_updated_kashio
 from app.digital.collectors.kashio.liquidations.main import get_main_kashio_liq
 from app.digital.collectors.monnet.main import get_main_monnet, get_updated_monnet
@@ -22,312 +22,306 @@ from app.config import Config
 
 
     
-##   CRON DIGITAL   ##  
+# cron digital
  
 
-# ============================================
-# ACTUALIZACIONES RECAUDADORES (CADA HORA)
-# CON SISTEMA DE BLOQUEO
-# ============================================
-# IMPORTANTEEEEE: Estos crons comparten el mismo lock con sus endpoints
+# updates recaudadores (cada hora)
+# con sistema de bloqueo
+# estos crons comparten el mismo lock con sus endpoints
 
 @repeat_at(cron="0 * * * *")
 @endpoint_lock("kashio-process")  
 def processing_data_with_cron_updated_kashio():
     try:
-        print("Ejecutando actualizacion para kashio...")
+        print("[info] ejecutando actualizacion para kashio...")
         get_updated_kashio()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Kashio update bloqueado: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] kashio update bloqueado: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron updated kashio: {e}")
+            print(f"[error] error en cron updated kashio: {e}")
 
 @repeat_at(cron="2 * * * *")
 @endpoint_lock("monnet-process")  
 def processing_data_with_cron_updated_monnet():
     try:
-        print("Ejecutando actualizacion para monnet...")
+        print("[info] ejecutando actualizacion para monnet...")
         get_updated_monnet()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Monnet update bloqueado: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] monnet update bloqueado: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron updated monnet: {e}")
+            print(f"[error] error en cron updated monnet: {e}")
 
 @repeat_at(cron="4 * * * *")
 @endpoint_lock("kushki-process")  
 def processing_data_with_cron_updated_kushki():
     try:
-        print("Ejecutando actualizacion para kushki...")
+        print("[info] ejecutando actualizacion para kushki...")
         get_updated_kushki()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Kushki update bloqueado: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] kushki update bloqueado: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron updated kushki: {e}")
+            print(f"[error] error en cron updated kushki: {e}")
 
 @repeat_at(cron="6 * * * *")
 @endpoint_lock("niubiz-process")  
 def processing_data_with_cron_updated_niubiz():
     try:
-        print("Ejecutando actualizacion para niubiz...")
+        print("[info] ejecutando actualizacion para niubiz...")
         get_updated_niubiz()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Niubiz update bloqueado: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] niubiz update bloqueado: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron updated niubiz: {e}")
+            print(f"[error] error en cron updated niubiz: {e}")
 
 @repeat_at(cron="8 * * * *")
 @endpoint_lock("yape-process")  
 def processing_data_with_cron_updated_yape():
     try:
-        print("Ejecutando actualizacion para yape...")
+        print("[info] ejecutando actualizacion para yape...")
         get_updated_yape()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Yape update bloqueado: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] yape update bloqueado: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron updated yape: {e}")
+            print(f"[error] error en cron updated yape: {e}")
 
 @repeat_at(cron="10 * * * *")
 @endpoint_lock("nuvei-process")  
 def processing_data_with_cron_updated_nuvei():
     try:
-        print("Ejecutando actualizacion para nuvei...")
+        print("[info] ejecutando actualizacion para nuvei...")
         asyncio.run(get_updated_nuvei())
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Nuvei update bloqueado: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] nuvei update bloqueado: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron updated nuvei: {e}")
+            print(f"[error] error en cron updated nuvei: {e}")
 
 @repeat_at(cron="12 * * * *")
 @endpoint_lock("pagoefectivo-process")  
 def processing_data_with_cron_updated_pagoefectivo():
     try:
-        print("Ejecutando actualizacion para pagoefectivo...")
+        print("[info] ejecutando actualizacion para pagoefectivo...")
         get_updated_pagoefectivo()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"PagoEfectivo update bloqueado: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] pagoefectivo update bloqueado: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron updated pagoefectivo: {e}")
+            print(f"[error] error en cron updated pagoefectivo: {e}")
 
 @repeat_at(cron="14 * * * *")
 @endpoint_lock("safetypay-process")  
 def processing_data_with_cron_updated_safetypay():
     try:
-        print("Ejecutando actualizacion para safetypay...")
+        print("[info] ejecutando actualizacion para safetypay...")
         get_updated_safetypay()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"SafetyPay update bloqueado: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] safetypay update bloqueado: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron updated safetypay: {e}")
+            print(f"[error] error en cron updated safetypay: {e}")
 
 @repeat_at(cron="16 * * * *")
 @endpoint_lock("tupay-process")  
 def processing_data_with_cron_updated_tupay():
     try:
-        print("Ejecutando actualizacion para tupay...")
+        print("[info] ejecutando actualizacion para tupay...")
         get_updated_tupay()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Tupay update bloqueado: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] tupay update bloqueado: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron updated tupay: {e}")
+            print(f"[error] error en cron updated tupay: {e}")
 
 
-# ============================================
-# CONCILIACIONES RECAUDADORES
-# CON SISTEMA DE BLOQUEO
-# ============================================
+# conciliaciones recaudadores
+# con sistema de bloqueo
 
-##todos los dias a las 05:30
+# todos los dias a las 05:30
 @repeat_at(cron="30 5 * * *")
 @endpoint_lock("kashio-process")  
 def processing_data_with_cron_getkashio():
     try:
-        print("Ejecutando conciliacion para kashio...")
+        print("[info] ejecutando conciliacion para kashio...")
         get_main_kashio()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Kashio conciliacion bloqueada: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] kashio conciliacion bloqueada: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron getkashio: {e}")
+            print(f"[error] error en cron getkashio: {e}")
 
-##todos los dias a las 05:00
+# todos los dias a las 05:00
 @repeat_at(cron="0 5 * * *")
 @endpoint_lock("monnet-process")  
 def processing_data_with_cron_getmonnet():
     try:
-        print("Ejecutando conciliacion para monnet...")
+        print("[info] ejecutando conciliacion para monnet...")
         get_main_monnet()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Monnet conciliacion bloqueada: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] monnet conciliacion bloqueada: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron getmonnet: {e}")
+            print(f"[error] error en cron getmonnet: {e}")
     
-##todos los dias a las 06:00
+# todos los dias a las 06:00
 @repeat_at(cron="0 6 * * *")
 @endpoint_lock("kushki-process")  
 def processing_data_with_cron_getkushki():
     try:
-        print("Ejecutando conciliacion para kushki...")
+        print("[info] ejecutando conciliacion para kushki...")
         get_main_kushki()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Kushki conciliacion bloqueada: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] kushki conciliacion bloqueada: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron getkushki: {e}")
+            print(f"[error] error en cron getkushki: {e}")
 
-##todos los dias a las 06:30
+# todos los dias a las 06:30
 @repeat_at(cron="30 6 * * *")
 @endpoint_lock("niubiz-process")  
 def processing_data_with_cron_getniubiz():
     try:
-        print("Ejecutando conciliacion para niubiz...")
+        print("[info] ejecutando conciliacion para niubiz...")
         get_main_niubiz()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Niubiz conciliacion bloqueada: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] niubiz conciliacion bloqueada: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron getniubiz: {e}")
+            print(f"[error] error en cron getniubiz: {e}")
 
-##todos los dias a las 07:00
+# todos los dias a las 07:00
 @repeat_at(cron="0 7 * * *")
 @endpoint_lock("yape-process")  
 def processing_data_with_cron_getyape():
     try:
-        print("Ejecutando conciliacion para yape...")
+        print("[info] ejecutando conciliacion para yape...")
         get_main_yape()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Yape conciliacion bloqueada: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] yape conciliacion bloqueada: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron getyape: {e}")
+            print(f"[error] error en cron getyape: {e}")
     
-##todos los dias a las 07:30
+# todos los dias a las 07:30
 @repeat_at(cron="30 7 * * *")
 @endpoint_lock("nuvei-process")  
 def processing_data_with_cron_getnuvei():
     try:
-        print("Ejecutando conciliacion para nuvei...")
+        print("[info] ejecutando conciliacion para nuvei...")
         asyncio.run(get_main_nuvei())
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Nuvei conciliacion bloqueada: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] nuvei conciliacion bloqueada: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron getnuvei: {e}")
+            print(f"[error] error en cron getnuvei: {e}")
     
-##todos los dias a las 08:00
+# todos los dias a las 08:00
 @repeat_at(cron="0 8 * * *")
 @endpoint_lock("pagoefectivo-process")  
 def processing_data_with_cron_getpagoefectivo():
     try:
-        print("Ejecutando conciliacion para pagoefectivo...")
+        print("[info] ejecutando conciliacion para pagoefectivo...")
         get_main_pagoefectivo()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"PagoEfectivo conciliacion bloqueada: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] pagoefectivo conciliacion bloqueada: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron getpagoefectivo: {e}")
+            print(f"[error] error en cron getpagoefectivo: {e}")
     
-##todos los dias a las 08:30
+# todos los dias a las 08:30
 @repeat_at(cron="30 8 * * *")
 @endpoint_lock("safetypay-process")  
 def processing_data_with_cron_getsafetypay():
     try:
-        print("Ejecutando conciliacion para safetypay...")
+        print("[info] ejecutando conciliacion para safetypay...")
         get_main_safetypay()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"SafetyPay conciliacion bloqueada: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] safetypay conciliacion bloqueada: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron getsafetypay: {e}")
+            print(f"[error] error en cron getsafetypay: {e}")
     
-##todos los dias a las 09:00
+# todos los dias a las 09:00
 @repeat_at(cron="0 9 * * *")
 @endpoint_lock("tupay-process")  
 def processing_data_with_cron_gettupayy():
     try:
-        print("Ejecutando conciliacion para tupay...")
+        print("[info] ejecutando conciliacion para tupay...")
         get_main_tupay()
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Tupay conciliacion bloqueada: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] tupay conciliacion bloqueada: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en cron gettupay: {e}")
+            print(f"[error] error en cron gettupay: {e}")
 
 
-# ============================================
-# LIQUIDACIONES DE RECAUDADORES
-# ============================================
+# liquidaciones de recaudadores
 
 # todos los dias a las 03:30 am
 @repeat_at(cron="30 3 * * *")
 @endpoint_lock("kashio-process-liq")
 def cron_liquidation_kashio():
     try:
-        print("Ejecutando proceso de liquidacion para Kashio")
+        print("[info] ejecutando proceso de liquidacion para kashio")
         result = get_main_kashio_liq()
         if result:
-            print(f"Resultado exitoso, archivo guardado en {result}")
+            print(f"[ok] resultado exitoso, archivo guardado en {result}")
         else:
-            print("Falla en el proceso")
+            print("[error] falla en el proceso")
             return
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Kashio liquidacion bloqueada: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] kashio liquidacion bloqueada: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en el cron de liq kashio: {e}")
+            print(f"[error] error en el cron de liq kashio: {e}")
         
 # todos los dias a las 4:15 am
 @repeat_at(cron="15 4 * * *")
 @endpoint_lock("tupay-process-liq")
 def cron_liquidation_tupay():
     try:
-        print("Ejecutando proceso de liquidacion para Tupay")
+        print("[info] ejecutando proceso de liquidacion para tupay")
         result = get_main_tupay_liq()
         if result:
-            print(f"Resultado exitoso, archivo guardado en {result}")
+            print(f"[ok] resultado exitoso, archivo guardado en {result}")
         else:
-            print("Falla en el proceso")
+            print("[error] falla en el proceso")
             return
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Tupay liquidacion bloqueada: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] tupay liquidacion bloqueada: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en el cron de liq Tupay: {e}")
+            print(f"[error] error en el cron de liq tupay: {e}")
 
 # todos los dias a las 4:30 am
 @repeat_at(cron="30 4 * * *")
 @endpoint_lock("pagoefectivo-process-liq")
 def cron_liquidation_pagoefectivo():
     try:
-        print("Ejecutando proceso de liquidacion para Pagoefectivo")
+        print("[info] ejecutando proceso de liquidacion para pagoefectivo")
         result = get_main_pagoefectivo_liq()
         if result:
-            print(f"Resultado exitoso, archivo guardado en {result}")
+            print(f"[ok] resultado exitoso, archivo guardado en {result}")
         else:
-            print("Falla en el proceso")
+            print("[error] falla en el proceso")
             return
     except Exception as e:
         if hasattr(e, 'status_code') and e.status_code == 409:
-            print(f"Pagoefectivo liquidacion bloqueada: {e.detail.get('message', 'Ya en ejecucion')}")
+            print(f"[warn] pagoefectivo liquidacion bloqueada: {e.detail.get('message', 'ya en ejecucion')}")
         else:
-            print(f"Error en el cron de liq Pagoefectivo: {e}")
+            print(f"[error] error en el cron de liq pagoefectivo: {e}")
 
 
 
-## limpiar los path al minuto 59 todos los dias
+# limpiar los path al minuto 59 todos los dias
 @repeat_at(cron="59 * * * *")
 def clean_paths_daily():
     try:
-        print("Ejecutando limpieza de paths...")
+        print("[info] ejecutando limpieza de paths...")
         clean_paths()
     except Exception as e:
-        print(f"Error en la limpieza de paths: {e}")
+        print(f"[error] error en la limpieza de paths: {e}")
