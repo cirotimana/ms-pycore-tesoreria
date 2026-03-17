@@ -46,7 +46,7 @@ def processing_data_with_cron_updated_kashio():
         else:
             print(f"[error] error en cron updated kashio: {e}")
 
-@repeat_at(cron="2 * * * *")
+@repeat_at(cron="1 * * * *")
 @endpoint_lock("monnet-process")  
 def processing_data_with_cron_updated_monnet():
     try:
@@ -58,7 +58,7 @@ def processing_data_with_cron_updated_monnet():
         else:
             print(f"[error] error en cron updated monnet: {e}")
 
-@repeat_at(cron="4 * * * *")
+@repeat_at(cron="2 * * * *")
 @endpoint_lock("kushki-process")  
 def processing_data_with_cron_updated_kushki():
     try:
@@ -70,7 +70,7 @@ def processing_data_with_cron_updated_kushki():
         else:
             print(f"[error] error en cron updated kushki: {e}")
 
-@repeat_at(cron="6 * * * *")
+@repeat_at(cron="3 * * * *")
 @endpoint_lock("niubiz-process")  
 def processing_data_with_cron_updated_niubiz():
     try:
@@ -82,7 +82,7 @@ def processing_data_with_cron_updated_niubiz():
         else:
             print(f"[error] error en cron updated niubiz: {e}")
 
-@repeat_at(cron="8 * * * *")
+@repeat_at(cron="4 * * * *")
 @endpoint_lock("yape-process")  
 def processing_data_with_cron_updated_yape():
     try:
@@ -94,7 +94,7 @@ def processing_data_with_cron_updated_yape():
         else:
             print(f"[error] error en cron updated yape: {e}")
 
-@repeat_at(cron="10 * * * *")
+@repeat_at(cron="5 * * * *")
 @endpoint_lock("nuvei-process")  
 def processing_data_with_cron_updated_nuvei():
     try:
@@ -106,7 +106,7 @@ def processing_data_with_cron_updated_nuvei():
         else:
             print(f"[error] error en cron updated nuvei: {e}")
 
-@repeat_at(cron="12 * * * *")
+@repeat_at(cron="6 * * * *")
 @endpoint_lock("pagoefectivo-process")  
 def processing_data_with_cron_updated_pagoefectivo():
     try:
@@ -118,7 +118,7 @@ def processing_data_with_cron_updated_pagoefectivo():
         else:
             print(f"[error] error en cron updated pagoefectivo: {e}")
 
-@repeat_at(cron="14 * * * *")
+@repeat_at(cron="7 * * * *")
 @endpoint_lock("safetypay-process")  
 def processing_data_with_cron_updated_safetypay():
     try:
@@ -130,7 +130,7 @@ def processing_data_with_cron_updated_safetypay():
         else:
             print(f"[error] error en cron updated safetypay: {e}")
 
-@repeat_at(cron="16 * * * *")
+@repeat_at(cron="8 * * * *")
 @endpoint_lock("tupay-process")  
 def processing_data_with_cron_updated_tupay():
     try:
@@ -146,8 +146,8 @@ def processing_data_with_cron_updated_tupay():
 # conciliaciones recaudadores
 # con sistema de bloqueo
 
-# todos los dias a las 05:30
-@repeat_at(cron="30 5 * * *")
+# todos los dias a las 05:10
+@repeat_at(cron="10 5 * * *")
 @endpoint_lock("kashio-process")  
 def processing_data_with_cron_getkashio():
     try:
@@ -159,8 +159,8 @@ def processing_data_with_cron_getkashio():
         else:
             print(f"[error] error en cron getkashio: {e}")
 
-# todos los dias a las 05:00
-@repeat_at(cron="0 5 * * *")
+# todos los dias a las 05:15
+@repeat_at(cron="15 5 * * *")
 @endpoint_lock("monnet-process")  
 def processing_data_with_cron_getmonnet():
     try:
@@ -172,8 +172,8 @@ def processing_data_with_cron_getmonnet():
         else:
             print(f"[error] error en cron getmonnet: {e}")
     
-# todos los dias a las 06:00
-@repeat_at(cron="0 6 * * *")
+# todos los dias a las 05:20
+@repeat_at(cron="20 5 * * *")
 @endpoint_lock("kushki-process")  
 def processing_data_with_cron_getkushki():
     try:
@@ -185,8 +185,8 @@ def processing_data_with_cron_getkushki():
         else:
             print(f"[error] error en cron getkushki: {e}")
 
-# todos los dias a las 06:30
-@repeat_at(cron="30 6 * * *")
+# todos los dias a las 05:25
+@repeat_at(cron="25 5 * * *")
 @endpoint_lock("niubiz-process")  
 def processing_data_with_cron_getniubiz():
     try:
@@ -198,8 +198,8 @@ def processing_data_with_cron_getniubiz():
         else:
             print(f"[error] error en cron getniubiz: {e}")
 
-# todos los dias a las 07:00
-@repeat_at(cron="0 7 * * *")
+# todos los dias a las 05:30
+@repeat_at(cron="30 5 * * *")
 @endpoint_lock("yape-process")  
 def processing_data_with_cron_getyape():
     try:
@@ -211,8 +211,8 @@ def processing_data_with_cron_getyape():
         else:
             print(f"[error] error en cron getyape: {e}")
     
-# todos los dias a las 07:30
-@repeat_at(cron="30 7 * * *")
+# todos los dias a las 05:35
+@repeat_at(cron="35 5 * * *")
 @endpoint_lock("nuvei-process")  
 def processing_data_with_cron_getnuvei():
     try:
@@ -224,8 +224,8 @@ def processing_data_with_cron_getnuvei():
         else:
             print(f"[error] error en cron getnuvei: {e}")
     
-# todos los dias a las 08:00
-@repeat_at(cron="0 8 * * *")
+# todos los dias a las 05:40
+@repeat_at(cron="40 5 * * *")
 @endpoint_lock("pagoefectivo-process")  
 def processing_data_with_cron_getpagoefectivo():
     try:
@@ -237,8 +237,8 @@ def processing_data_with_cron_getpagoefectivo():
         else:
             print(f"[error] error en cron getpagoefectivo: {e}")
     
-# todos los dias a las 08:30
-@repeat_at(cron="30 8 * * *")
+# todos los dias a las 05:45
+@repeat_at(cron="45 5 * * *")
 @endpoint_lock("safetypay-process")  
 def processing_data_with_cron_getsafetypay():
     try:
@@ -250,8 +250,8 @@ def processing_data_with_cron_getsafetypay():
         else:
             print(f"[error] error en cron getsafetypay: {e}")
     
-# todos los dias a las 09:00
-@repeat_at(cron="0 9 * * *")
+# todos los dias a las 05:50
+@repeat_at(cron="50 5 * * *")
 @endpoint_lock("tupay-process")  
 def processing_data_with_cron_gettupayy():
     try:
@@ -323,10 +323,10 @@ def cron_liquidation_pagoefectivo():
 
 
 # limpiar los path al minuto 59 todos los dias
-@repeat_at(cron="59 * * * *")
+@repeat_at(cron="59 */3 * * *")
 def clean_paths_daily():
     try:
         print("[info] ejecutando limpieza de paths...")
         clean_paths()
     except Exception as e:
-        print(f"[error] error en la limpieza de paths: {e}")
+        print(f"[error] error en la limpieza de paths: {e}")
