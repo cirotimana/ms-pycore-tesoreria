@@ -29,8 +29,8 @@ def login(
     # buscar usuario por username
     statement = select(TblUser).where(
         TblUser.username == credentials.username,
-        TblUser.activo == True,
-        TblUser.delete_at.is_(None)
+        TblUser.is_active == True,
+        TblUser.deleted_at.is_(None)
     )
     user = session.exec(statement).first()
 
@@ -77,5 +77,5 @@ def get_current_user_info(
         email=current_user.email,
         first_name=current_user.first_name,
         last_name=current_user.last_name,
-        is_active=current_user.activo
+        is_active=current_user.is_active
     )
