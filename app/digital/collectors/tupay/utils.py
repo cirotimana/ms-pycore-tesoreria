@@ -211,8 +211,8 @@ async def close_playwright_resources_tupay(browser, context, page):
 # =============================
 async def get_data_json_tupay_async(bearer_cookie, from_date, to_date):
     
-    start_date = from_date.replace(hour=5, minute=0, second=0) 
-    end_date = (to_date + timedelta(days=1)).replace(hour=5, minute=0, second=0)
+    start_date = from_date.replace(hour=0, minute=0, second=0) 
+    end_date = to_date.replace(hour=23, minute=59, second=59)
     
     from_date_str = start_date.strftime("%Y-%m-%d %H:%M:%S") 
     to_date_str = end_date.strftime("%Y-%m-%d %H:%M:%S")
