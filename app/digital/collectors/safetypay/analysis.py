@@ -218,10 +218,15 @@ def conciliation_data(from_date, to_date):
         # Filtrar solo los que estan solo en uno de los dos
         df_no_conciliados_filtrado = df_no_conciliados[df_no_conciliados['Recaudador Aprobado'].isin(['Calimaco Aprobado', 'Safetypay Aprobado'])]
         
-        df_nc_calimaco = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado']
-        df_nc_calimaco = df_nc_calimaco[cols_calimaco]
-        df_nc_safetypay = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Safetypay Aprobado']
-        df_nc_safetypay = df_nc_safetypay[cols_safetypay]
+        # fechar las vistas sin zonas horarias locales para una comparacion nativa
+        start = from_date.replace(tzinfo=None)
+        end = to_date.replace(tzinfo=None)
+        
+        df_nc_calimaco = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado'][cols_calimaco]
+        df_nc_calimaco = df_nc_calimaco[pd.to_datetime(df_nc_calimaco['Fecha de modificación'], errors='coerce').dt.tz_localize(None).between(start, end)]
+
+        df_nc_safetypay = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Safetypay Aprobado'][cols_safetypay]
+        df_nc_safetypay = df_nc_safetypay[pd.to_datetime(df_nc_safetypay['FECHA'], errors='coerce').dt.tz_localize(None).between(start, end)]
 
         # guardar resultado en s3
         current_time = datetime.now(pytz.timezone("America/Lima")).strftime("%Y%m%d%H%M%S")
