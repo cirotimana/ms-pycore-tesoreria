@@ -223,8 +223,7 @@ def conciliation_data(from_date, to_date):
         end = to_date.replace(tzinfo=None)
         
         df_nc_calimaco = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado'][cols_calimaco]
-        df_nc_calimaco = df_nc_calimaco[pd.to_datetime(df_nc_calimaco['Fecha de modificación'], errors='coerce').dt.tz_localize(None).between(start, end)]
-
+        
         df_nc_safetypay = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Safetypay Aprobado'][cols_safetypay]
         df_nc_safetypay = df_nc_safetypay[pd.to_datetime(df_nc_safetypay['FECHA'], errors='coerce').dt.tz_localize(None).between(start, end)]
 
