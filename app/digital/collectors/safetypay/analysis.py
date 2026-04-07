@@ -140,6 +140,12 @@ def conciliation_data(from_date, to_date):
         df2 = df2[df2['ESTADO PROVEEDOR'].isin(['Compra completada'])].drop_duplicates(subset=['ID CALIMACO'], keep='first')
         df1 = df1.drop_duplicates(subset=['ID', 'Estado'])
 
+        # fechar las vistas sin zonas horarias locales para una comparacion nativa
+        start = from_date.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+        end = to_date.replace(hour=23, minute=59, second=59, microsecond=0, tzinfo=None)
+
+        df2 = df2[pd.to_datetime(df2['FECHA'], dayfirst=True, errors='coerce').dt.tz_localize(None).between(start, end)]
+
         # Iniciar insercion en base de datos en paralelo
         def initial_save(session):
             bulk_upsert_collector_records_optimized(session, df2, 8)  
@@ -168,7 +174,6 @@ def conciliation_data(from_date, to_date):
             "MONTO",
             "ESTADO PROVEEDOR",
         ]
-
   
         ## todos los que no son aprobados en calimaco
         df_no_aprovated_calimaco = df1[df1['Estado'].isin(['Denegado', 'Nuevo', 'CANCELLED', 'Límites excedidos' ])]
@@ -218,14 +223,8 @@ def conciliation_data(from_date, to_date):
         # Filtrar solo los que estan solo en uno de los dos
         df_no_conciliados_filtrado = df_no_conciliados[df_no_conciliados['Recaudador Aprobado'].isin(['Calimaco Aprobado', 'Safetypay Aprobado'])]
         
-        # fechar las vistas sin zonas horarias locales para una comparacion nativa
-        start = from_date.replace(tzinfo=None)
-        end = to_date.replace(tzinfo=None)
-        
         df_nc_calimaco = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Calimaco Aprobado'][cols_calimaco]
-        
         df_nc_safetypay = df_no_conciliados_filtrado[df_no_conciliados_filtrado['Recaudador Aprobado'] == 'Safetypay Aprobado'][cols_safetypay]
-        df_nc_safetypay = df_nc_safetypay[pd.to_datetime(df_nc_safetypay['FECHA'], errors='coerce').dt.tz_localize(None).between(start, end)]
 
         # guardar resultado en s3
         current_time = datetime.now(pytz.timezone("America/Lima")).strftime("%Y%m%d%H%M%S")
