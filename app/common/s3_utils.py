@@ -301,3 +301,6 @@ def clean_paths():
     print("[ok] limpieza diaria completada")
 
 
+
+if __name__ == "__main__":
+    clean_paths()
