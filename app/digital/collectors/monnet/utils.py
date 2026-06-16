@@ -1,7 +1,7 @@
 import pandas as pd
 import asyncio
 from playwright.async_api import async_playwright
-from playwright_stealth import stealth_async
+from playwright_stealth import Stealth
 import requests
 from datetime import datetime, timedelta
 import json
@@ -88,7 +88,7 @@ async def get_token_monnet():
             """)
 
             page = await context.new_page()
-            await stealth_async(page)
+            await Stealth().use(page)
             token_found = None
 
             async def handle_request(route, request):
