@@ -65,7 +65,7 @@ async def get_token_monnet():
         async with async_playwright() as p:
             print("[info] lanzando navegador para monnet")
             browser = await p.chromium.launch(
-                headless=False,
+                headless=True,
                 args=[
                     "--no-sandbox",
                     "--disable-dev-shm-usage", 
