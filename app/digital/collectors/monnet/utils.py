@@ -105,6 +105,14 @@ async def get_token_monnet():
             print("[info] realizando login")
             await page.fill('input[name="username"], input[type="email"]', Config.USER_NAME_MONNET)
             await page.fill('input[name="password"]', Config.PASSWORD_MONNET)
+
+            try:
+                # recaptcha v2
+                await page.frame_locator('iframe[title*="reCAPTCHA"]').locator('.recaptcha-checkbox-border').click(timeout=5000)
+                await page.wait_for_timeout(2000) # dar tiempo a la animacion del check
+            except Exception:
+                print("[debug] recaptcha no encontrado o ya resuelto")
+
             await page.click('button[type="submit"], #kc-login')
 
             # esperar a que se cargue el contenido
